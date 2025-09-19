@@ -62,7 +62,7 @@ green.sol: Collapse Profitable M53
 
 License
 
-This repository is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). The lib.rs file is licensed under the MIT License for broader compatibility. The green.sol file is licensed under the MIT License for broader compatibility.
+This repository is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). The lib.rs file is licensed under the MIT License for broader compatibility. The green.sol file is licensed under the MIT License for broader compatibility. The profitability.rs file is licensed under the MIT License for broader compatibility.
 
 Contributing
 
