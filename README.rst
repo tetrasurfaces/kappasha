@@ -1,5 +1,81 @@
 .. This file is included into docs/history.rst
 
+Hashlet
+
+Hashlet is a fork of greenlet, extending lightweight coroutines with SHA256 hashing and RGB color mapping for Machine Environment Interface (MEI) visuals. It supports advanced control flow for concurrent programming, optimized for blockchain applications like arbitrage profitability checks and keyspace traversal using left-weighted sequences.
+
+Features
+
+Concurrent Hashing: Extends greenlet with SHA256 on greenlet ID/timestamp for immutable state tracking.
+
+RGB Interoperations: Maps hashes to 24-bit RGB colors for MEI visualizations (e.g., chrysanthemum ramps).
+
+Left-Weighted Sequence: Generates sequences (e.g., 11, 21, ..., 918) for efficient keyspace exploration, inspired by 16:7 (1:1) scale with 18 integers.
+
+Profitability Checks: Rust-based and Solidity-based Δp * s > f calculations for on-chain arbitrage, with M53 Mersenne prime integration.
+
+Applications: Ties to Greenpaper models (e.g., ternary ECC, Gaussian collapses) for blockchain and AI research.
+
+
+Installation
+
+pip install greenlet
+
+Clone the repo:
+
+git clone https://github.com/coneing/hashlet.git
+cd hashlet
+
+For Rust components:
+
+cargo build --release
+
+Usage
+
+
+
+hashlet.py: Run concurrent tasks with hashing and RGB output.
+
+python hashlet.py
+
+Outputs: Hashes and RGB colors (e.g., #abcdef).
+
+
+
+left_weighted_scale.py: Generate left-weighted sequences and balance scale placements.
+
+python left_weighted_scale.py
+
+Outputs: Sequence (e.g., [11, 21, ..., 918]) and weighing placements for 1-18.
+
+
+
+lib.rs: Rust library for profitability checks (build as a crate).
+
+cargo test
+
+Outputs: Passes profitability tests for given inputs.
+
+
+green.sol: Collapse Profitable M53
+
+
+License
+
+This repository is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). The lib.rs file is licensed under the MIT License for broader compatibility. The green.sol file is licensed under the MIT License for broader compatibility.
+
+Contributing
+
+Fork the repo, make changes, and submit pull requests. Focus areas:
+
+Optimize MEI RGB mappings for finer entropy (~262K colors).
+
+Extend left-weighted sequences for larger keyspaces.
+
+
+
+What is a Greenlet?
+===================
 
 Greenlets are lightweight coroutines for in-process concurrent
 programming.
