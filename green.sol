@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-contract green.sol {
+contract green {
     using SafeMath for uint256;
 
     uint256 public constant FEE_RATE = 30;  // 0.003 * 10^4 (scaled)
