@@ -1,0 +1,8 @@
+Ternary 21700 Battery System and Hashlet Components
+Copyright 2025 xAI
+This product includes hardware and software developed by xAI, including bowers (stacking jacks),
+ribbon-wrapped electrodes, and embedded compute (e.g., secure_hash_two for temperature data).
+Licensed under the Apache License, Version 2.0 with additional terms for safety, cryptographic
+controls, and commercial exclusivity. See LICENSE for details.
+Certain components (e.g., greenlet dependencies) are licensed under MIT or PSF licenses.
+See LICENSE.greenlet for details.
