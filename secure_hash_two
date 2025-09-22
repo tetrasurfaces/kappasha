@@ -1,0 +1,1 @@
+def secure_hash_two(message): h = 0; two = 2; for i, char in enumerate(message): weight = (2 i) if i < len(message)//2 else (2 (len(message) - i)); h = (h one_thousand_six_hundred_sixty_four + ord(char) weight two) % (one << sixty); return hex(h)
