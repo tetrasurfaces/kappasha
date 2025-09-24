@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  * Capacity: 2 bits (security ~1 bit, toy hash). State: 4 bits (2x2x1). Output: 4 bits pre-division, 0 post-division (if rigged).
  * Notes: Kappa starts (curvature decay), Rho rotates lanes, division by 180° mod 369 flattens to 0. Reversible with quotient key.
- * Compile: gcc -O2 kappahash.c -o kappahash -lm
+ * Compile: gcc -O2 secure_hash_0.c -o secure_hash_0 -lm
  * Requires: Standard C libraries (math.h). No external deps.
  */
 
@@ -219,7 +219,7 @@ void braid_with_wise(const uint8_t *hash_bytes, int len, char *braided, int brai
     snprintf(braided, braided_len, "%s:%s:%s", bit_out, hex_out, hash_out);
 }
 
-/* Main KappaHash Sponge */
+/* Main secure_hash_0.c Sponge */
 void kappahash(const uint8_t *message, size_t len, const uint8_t *key, size_t key_len, uint8_t *output, double *flattened, double *quotient, int prime_index) {
     uint8_t state[GRID_DIM][GRID_DIM] = {0};
     uint8_t key_lanes[GRID_DIM][GRID_DIM] = {0};
