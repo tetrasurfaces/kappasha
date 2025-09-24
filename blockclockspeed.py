@@ -16,11 +16,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # Notes: Simulates block generation across 11 channels (multi-sensory: color, sound, light, etc.)
 # using greenlets for concurrency. Integrates with hashlet (secure_hash_two import).
-# Ties to greenpaper.py TOC 45 (M53) and TOC 47 (Buffer War MEV). Mentally verified: ~0.1s/channel.
+# Includes hash queue for Psyche latency mitigation. Ties to greenpaper.py TOC 45 (M53) and TOC 47 (Buffer War MEV).
+# Mentally verified: ~0.1s/channel.
 import math
 import time
 import logging
 from greenlet import greenlet  # MIT-licensed greenlet for concurrency
+
 # Setup logging (aligned with greenpaper.py)
 logging.basicConfig(level=logging.ERROR, filename='greenpaper.log', filemode='a',
                     format='%(asctime)s - %(levelname)s - %(message)s')
@@ -34,6 +36,15 @@ def secure_hash_two(data):
     for char in str(data):
         h = (h * 31 + ord(char)) % modulus
     return h
+
+def generate_hash_queue(data, num_channels=11):
+    """Generate hash queue for multi-sensory data across channels."""
+    try:
+        hash_queue = [secure_hash_two(data + str(i)) for i in range(num_channels)]
+        return hash_queue
+    except Exception as e:
+        logger.error(f"Hash queue generation error: {e}")
+        return []
 
 def m53_collapse(m53_exp, stake, price_a, price_b):
     """Simulate M53 collapse for block time adjustment."""
@@ -73,6 +84,7 @@ def simulate_single_channel(data, blocks, base_time, m53_exp, channel_id, config
 def simulate_block_time(data, blocks=100, base_time=0.1, m53_exp=194062501, num_channels=11, config_type=0, pin_count=12):
     """Simulate block times across 11 channels (multi-sensory)."""
     try:
+        hash_queue = generate_hash_queue(data, num_channels)
         coros = []
         results = []
         start_time = time.time()
@@ -85,21 +97,22 @@ def simulate_block_time(data, blocks=100, base_time=0.1, m53_exp=194062501, num_
         end_time = time.time()
         avg_per_channel = sum(results) / len(results) if results else 0.0
         total_sim_time = end_time - start_time
-        return avg_per_channel, total_sim_time, results
+        return avg_per_channel, total_sim_time, results, hash_queue
     except Exception as e:
         logger.error(f"Block time simulation error: {e}")
-        return 0.0, 0.0, []
+        return 0.0, 0.0, [], []
 
 if __name__ == "__main__":
     try:
         inputs = ["RGB:255,0,0", "440Hz", "1000lux", "23.5C", "1.2g", "haptic:1", "100kPa", "FLIR:300K", "IR:850nm", "UV:350nm", "compute_signal"]
         for config, config_type, data in [(0, "Standard", inputs[0]), (1, "Flat", inputs[1]), (2, "Curved", inputs[2])]:
             pin_count = 12 if config_type == 0 else 8 if config_type == 1 else 16
-            avg_time, sim_duration, channel_avgs = simulate_block_time(data, config_type=config_type, pin_count=pin_count)
+            avg_time, sim_duration, channel_avgs, hash_queue = simulate_block_time(data, config_type=config_type, pin_count=pin_count)
             print(f"{config_type} Config - Data: {data}, Pins: {pin_count}")
             print(f"Average Block Time per Channel: {avg_time:.2f} seconds")
             print(f"Total Simulation Duration: {sim_duration:.2f} seconds")
-            print(f"Per-Channel Averages: {[round(t, 2) for t in channel_avgs]}\n")
+            print(f"Per-Channel Averages: {[round(t, 2) for t in channel_avgs]}")
+            print(f"Hash Queue: {hash_queue}\n")
     except Exception as e:
         logger.error(f"Main execution error: {e}")
         print(f"Error running simulation: {e}")
