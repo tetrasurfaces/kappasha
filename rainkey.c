@@ -124,23 +124,23 @@ int pollard_kangaroo_on_grid(int start_r, int start_c, int target_r, int target_
     int m = (int)sqrt(grid_rows * grid_cols) + 15;
     int jumps[8][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
     int tame_map[4][10] = {-1};
-    int x_t = start_r, y_t = start_c;
+    int x_t = start_r, y_t = start_c;  // Start tame at initial position
     for (int i = 0; i < m; i++) {
         int pos_r = x_t % grid_rows;
         int pos_c = y_t % grid_cols;
         if (tame_map[pos_r][pos_c] == -1) tame_map[pos_r][pos_c] = i;
         int j = rand() % 8;
-        x_t = (x_t + jumps[j][0]) % grid_rows;
-        y_t = (y_t + jumps[j][1]) % grid_cols;
+        x_t = (x_t + jumps[j][0] + grid_rows) % grid_rows;  // Ensure positive modulo
+        y_t = (y_t + jumps[j][1] + grid_cols) % grid_cols;
     }
-    int x_w = target_r, y_w = target_c;
+    int x_w = target_r, y_w = target_c;  // Start wild at target
     for (int i = 0; i < m * 4; i++) {
         int pos_r = x_w % grid_rows;
         int pos_c = y_w % grid_cols;
         if (tame_map[pos_r][pos_c] != -1) return tame_map[pos_r][pos_c] + i;
         int j = rand() % 8;
-        x_w = (x_w + jumps[j][0]) % grid_rows;
-        y_w = (y_w + jumps[j][1]) % grid_cols;
+        x_w = (x_w + jumps[j][0] + grid_rows) % grid_rows;
+        y_w = (y_w + jumps[j][1] + grid_cols) % grid_cols;
     }
     // Fallback to Manhattan distance
     return abs(start_r - target_r) + abs(start_c - target_c);
@@ -154,7 +154,11 @@ void generate_spectrum_kappa(char *sequence, char *kappa, int len) {
     while (i < 16) kappa[i++] = '0';
     kappa[16] = '\0';
     for (i = 0; i < 16; i++) kappa[i] = tolower(kappa[i]);
-    sprintf(kappa, "0x%s", kappa + (kappa[0] == '0' && kappa[1] == 'x' ? 2 : 0));
+    if (kappa[0] == '0' && kappa[1] == 'x') {
+        memmove(kappa, kappa + 2, 16);
+        kappa[16] = '\0';
+    }
+    sprintf(kappa, "0x%s", kappa);
 }
 
 double calculate_shannon_entropy(char *sequence) {
