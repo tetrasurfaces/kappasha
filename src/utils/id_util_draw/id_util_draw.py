@@ -71,7 +71,7 @@ CLOSE_THRESHOLD = 0.05  # Distance to first point to consider closing
 vanishing_points = []  # Vanishing points for each triangulation
 previous_kappa = 1.0  # Initial kappa for decay
 curvature = 1.0  # Initial curvature (kappa)
-ipod_surface = None  # iPod surface in 3D
+ipod_3d = None  # iPod model in 3D
 
 # Compute golden spiral
 def compute_golden_spiral():
@@ -141,13 +141,13 @@ def custom_interoperations_green_curve(points, kappas):
 def compute_segment_kappa(p1, p2, base_kappa=1.0, prev_kappa=1.0):
     """
     Computes kappa for a segment with decay based on theta (distance).
-   
+  
     Args:
         p1 (tuple): Starting point (x1, y1, first endpoint, kappa node).
         p2 (tuple): Ending point (x2, y2, theta).
         base_kappa (float): Base kappa value from slider.
         prev_kappa (float): Previous kappa for decay calculation.
-   
+  
     Returns:
         float: Current kappa value (for second endpoint).
     """
@@ -327,15 +327,10 @@ def on_click_dimension(event):
         fig_2d.canvas.draw()
 # Drawing mode: Add kappa nodes and update continuous greencurve
 def on_click_draw(event):
-    global green_curve_line, selected_curve, previous_kappa, vanishing_points, ipod_3d
+    global green_curve_line, selected_curve, previous_kappa, vanishing_points
     if event.inaxes == ax_2d and event.button == 1:
         x, y = event.xdata, event.ydata
         if draw_mode and not (protractor_active or ruler_active or dimension_active):
-            # Remove iPod model when drawing begins
-            if ipod_3d:
-                ipod_3d.remove()
-                ipod_3d = None
-                fig_3d.canvas.draw()
             # Check if near first point to close
             if len(drawing_points) > 2:
                 dx_first = x - drawing_points[0][0]
@@ -345,7 +340,7 @@ def on_click_draw(event):
                     # Adjust kappa1 based on last theta and kappa
                     last_theta = np.sqrt((drawing_points[-1][0] - drawing_points[0][0])**2 + (drawing_points[-1][1] - drawing_points[0][1])**2)
                     decay_factor = np.exp(-last_theta / WIDTH / 20.0)
-                    kappas[0] = kappas[-1] * decay_factor * curvature  # Affect kappa1 with last kappa and decay
+                    kappas[0] = kappas[-1] * decay_factor * curvature # Affect kappa1 with last kappa and decay
                     redraw_green_curve()
                     drawing_points.append(drawing_points[0])
                     kappas.append(curvature)
@@ -427,12 +422,10 @@ def on_motion(event):
         x_ghost, y_ghost = custom_interoperations_green_curve(preview_points, preview_kappas)
         ghost_curve.set_data(x_ghost, y_ghost)
         fig_2d.canvas.draw()
-
 # Close polyhedron (manual trigger)
 def close_polyhedron(event):
     if event.key == 'c':
         print("Close via clicking near first point when ghosted")
-
 # Change to construction geometry
 def to_construction(event):
     global selected_curve
@@ -442,7 +435,6 @@ def to_construction(event):
         print("Green curve changed to construction geometry")
         selected_curve = None
         fig_2d.canvas.draw()
-
 # Hide/show
 def hide_show(event):
     global hidden_elements, selected_curve
@@ -465,7 +457,6 @@ def hide_show(event):
             hidden_elements.clear()
             print("All hidden elements shown")
         fig_2d.canvas.draw()
-
 # Reset canvas
 def reset_canvas(event):
     global drawing_points, kappas, previous_kappa, green_curve_line, points_3d, vanishing_points, selected_curve
@@ -483,7 +474,6 @@ def reset_canvas(event):
         fig_3d.canvas.draw()
         print("Canvas reset")
         fig_2d.canvas.draw()
-
 # Compute curvature for continuity check
 def compute_curvature(x, y, t):
     dt = t[1] - t[0]
@@ -495,7 +485,6 @@ def compute_curvature(x, y, t):
     denominator = (dx_dt**2 + dy_dt**2)**1.5
     denominator = np.where(denominator == 0, 1e-10, denominator)
     return numerator / denominator
-
 # Connect events
 fig_2d.canvas.mpl_connect('key_press_event', toggle_draw)
 fig_2d.canvas.mpl_connect('key_press_event', toggle_protractor)
@@ -510,7 +499,6 @@ fig_2d.canvas.mpl_connect('button_press_event', on_click_dimension)
 fig_2d.canvas.mpl_connect('button_press_event', on_click_draw)
 fig_2d.canvas.mpl_connect('motion_notify_event', on_motion)
 fig_2d.canvas.mpl_connect('key_press_event', close_polyhedron)
-
 # Plot properties
 ax_2d.set_xlim(0, WIDTH)
 ax_2d.set_ylim(0, HEIGHT)
@@ -518,7 +506,6 @@ ax_2d.set_aspect('equal')
 ax_2d.legend(loc='center left', bbox_to_anchor=(1.0, 0.5), fontsize='small')
 ax_2d.grid(True)
 ax_2d.set_title('2D Drawing Tool on A3 Landscape with Continuous Green Curve')
-
 # Display iPod surface by default in 3D
 def display_ipod_surface():
     global ipod_surface
@@ -530,20 +517,16 @@ def display_ipod_surface():
     ipod_surface = ax_3d.plot_surface(X, Y, Z, cmap='viridis', alpha=0.5)
     ax_3d.set_title('3D iPod Surface (Curvature Continuous)')
     fig_3d.canvas.draw()
-
-display_ipod_surface()  # Show iPod surface on load
-
+display_ipod_surface() # Show iPod surface on load
 # Draw default iPod ellipse as green curve on 2D canvas
 def draw_default_ipod(canvas, color='green'):
     points = np.array([[0,0], [1,0], [1,1], [0,1]])
-    radius = sum(ord(c) for c in 'ipod') % 150  # = 428 % 150 = 128
+    radius = sum(ord(c) for c in 'ipod') % 150 # = 428 % 150 = 128
     scaled = points * radius
     theta = np.linspace(0, 2 * np.pi, 200)
     x = radius * np.cos(theta) + WIDTH / 2
-    y = radius * 0.5 * np.sin(theta) + HEIGHT / 2  # Ellipse aspect
+    y = radius * 0.5 * np.sin(theta) + HEIGHT / 2 # Ellipse aspect
     canvas.plot(x, y, color=color, linewidth=3)
     canvas.axis('equal')
-
-draw_default_ipod(ax_2d)  # Draw default iPod ellipse on load
-
+draw_default_ipod(ax_2d) # Draw default iPod ellipse on load
 plt.show()
