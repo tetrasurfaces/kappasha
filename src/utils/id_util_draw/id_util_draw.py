@@ -13,7 +13,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -24,31 +23,25 @@ import hashlib
 from decimal import Decimal, getcontext
 import warnings
 from matplotlib import MatplotlibDeprecationWarning
-
 # Set precision for Decimal
 getcontext().prec = 28
-
 # Suppress warnings
 warnings.filterwarnings("ignore", category=MatplotlibDeprecationWarning)
-
 # A3 landscape dimensions (normalized: width long side, height short side)
-WIDTH = 420 / 297  # A3 landscape: 420mm width, 297mm height, normalized height=1.0
+WIDTH = 420 / 297 # A3 landscape: 420mm width, 297mm height, normalized height=1.0
 HEIGHT = 1.0
-PURPLE_LINES = [1/3, 2/3]  # Dividers on the width
-unit_per_mm = 1.0 / 297  # Normalize to A3 short side
+PURPLE_LINES = [1/3, 2/3] # Dividers on the width
+unit_per_mm = 1.0 / 297 # Normalize to A3 short side
 scale_label = f"Scale: 1mm = {unit_per_mm:.5f} units (A3 short side = 297mm)"
-
 # Dreyfuss ergonomics: Optimal eye distance ~20 inches (508mm)
-EYE_DISTANCE = 500 * unit_per_mm  # Normalized eye distance to viewport
-HORIZON_HEIGHT = HEIGHT * 0.5  # Default horizon line at half height
-EYE_LINE = HORIZON_HEIGHT  # Eye line coincides with horizon
-
+EYE_DISTANCE = 500 * unit_per_mm # Normalized eye distance to viewport
+HORIZON_HEIGHT = HEIGHT * 0.5 # Default horizon line at half height
+EYE_LINE = HORIZON_HEIGHT # Eye line coincides with horizon
 # Golden spiral parameters
 PHI = (1 + np.sqrt(5)) / 2
 kappa = 1 / PHI
 A_SPIRAL = 0.01
 B_SPIRAL = np.log(PHI) / (np.pi / 2)
-
 # Global variables for interactive modes
 protractor_active = False
 ruler_active = False
@@ -63,16 +56,15 @@ ruler_points = []
 ruler_line = None
 ruler_text = None
 dimension_labels = []
-drawing_points = []  # Kappa nodes (first endpoint of each greenchord)
-kappas = []  # Kappa values at each node
-green_curve_line = None  # Single plot object for the interoperated greencurve
-points_3d = []  # For 3D polyhedron
-CLOSE_THRESHOLD = 0.05  # Distance to first point to consider closing
-vanishing_points = []  # Vanishing points for each triangulation
-previous_kappa = 1.0  # Initial kappa for decay
-curvature = 1.0  # Initial curvature (kappa)
-ipod_surface = None  # iPod surface in 3D
-
+drawing_points = [] # Kappa nodes (first endpoint of each greenchord)
+kappas = [] # Kappa values at each node
+green_curve_line = None # Single plot object for the interoperated greencurve
+points_3d = [] # For 3D polyhedron
+CLOSE_THRESHOLD = 0.05 # Distance to first point to consider closing
+vanishing_points = [] # Vanishing points for each triangulation
+previous_kappa = 1.0 # Initial kappa for decay
+curvature = 1.0 # Initial curvature (kappa)
+ipod_3d = None # iPod model in 3D
 # Compute golden spiral
 def compute_golden_spiral():
     theta = np.linspace(0, 10 * np.pi, 1000)
@@ -80,27 +72,26 @@ def compute_golden_spiral():
     x = r * np.cos(theta)
     y = r * np.sin(theta)
     return x, y
-
 # Custom interoperations for greencurve (custom kappa NURBS with endpoint kappa and theta decay)
 def custom_interoperations_green_curve(points, kappas):
     """
     Custom kappa NURBS-like curve through points with endpoint kappa and theta decay for curvature continuity.
-    
+   
     Args:
         points (list): List of (x, y) points (kappa nodes).
         kappas (list): Kappa values at each node.
-    
+   
     Returns:
         tuple: (x, y) arrays for the interoperated curve.
     """
     if len(points) < 2:
         return np.array([]), np.array([])
-    
+   
     x_points = [p[0] for p in points]
     y_points = [p[1] for p in points]
     t = np.cumsum([0] + [np.sqrt((x_points[i+1] - x_points[i])**2 + (y_points[i+1] - y_points[i])**2) for i in range(len(points)-1)])
     t_fine = np.linspace(0, t[-1], 1000) if t[-1] > 0 else np.linspace(0, 1, 1000)
-    
+   
     # Custom NURBS basis functions (cubic, degree 3 for G2 continuity, extended to G5 with higher order terms)
     def nurbs_basis(u, i, p, knots):
         if p == 0:
@@ -114,10 +105,10 @@ def custom_interoperations_green_curve(points, kappas):
         else:
             c2 = (knots[i+p+1] - u) / (knots[i+p+1] - knots[i+1]) * nurbs_basis(u, i+1, p-1, knots)
         return c1 + c2
-    
+   
     # Generate knots based on theta (distance), non-uniform for decay
     knots = [0] * 4 + list(np.cumsum([kappas[i] for i in range(len(points))])) + [t[-1]] * 4 # Clamped knots for endpoint interpolation
-    
+   
     x_fine = []
     y_fine = []
     for u in t_fine:
@@ -135,7 +126,7 @@ def custom_interoperations_green_curve(points, kappas):
         y_val *= decay
         x_fine.append(x_val)
         y_fine.append(y_val)
-    
+   
     return np.array(x_fine), np.array(y_fine)
 # Compute kappa for a segment, second endpoint influences next kappa
 def compute_segment_kappa(p1, p2, base_kappa=1.0, prev_kappa=1.0):
@@ -327,15 +318,10 @@ def on_click_dimension(event):
         fig_2d.canvas.draw()
 # Drawing mode: Add kappa nodes and update continuous greencurve
 def on_click_draw(event):
-    global green_curve_line, selected_curve, previous_kappa, vanishing_points, ipod_3d
+    global green_curve_line, selected_curve, previous_kappa, vanishing_points
     if event.inaxes == ax_2d and event.button == 1:
         x, y = event.xdata, event.ydata
         if draw_mode and not (protractor_active or ruler_active or dimension_active):
-            # Remove iPod model when drawing begins
-            if ipod_3d:
-                ipod_3d.remove()
-                ipod_3d = None
-                fig_3d.canvas.draw()
             # Check if near first point to close
             if len(drawing_points) > 2:
                 dx_first = x - drawing_points[0][0]
@@ -522,11 +508,11 @@ ax_2d.set_title('2D Drawing Tool on A3 Landscape with Continuous Green Curve')
 # Display iPod surface by default in 3D
 def display_ipod_surface():
     global ipod_surface
-    theta, phi = np.meshgrid(np.linspace(0, 2 * np.pi, 100), np.linspace(0, 2 * np.pi, 100))
+    theta, z = np.meshgrid(np.linspace(0, 2 * np.pi, 100), np.linspace(-0.5, 0.5, 50))
     r = 0.5 + 0.2 * np.sin(6 * theta)
     X = r * np.cos(theta)
     Y = r * np.sin(theta)
-    Z = 0.1 * np.sin(12 * theta) * (1 + 0.5) + phi / (2 * np.pi)
+    Z = z
     ipod_surface = ax_3d.plot_surface(X, Y, Z, cmap='viridis', alpha=0.5)
     ax_3d.set_title('3D iPod Surface (Curvature Continuous)')
     fig_3d.canvas.draw()
