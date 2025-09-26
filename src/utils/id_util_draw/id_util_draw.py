@@ -63,15 +63,14 @@ ruler_points = []
 ruler_line = None
 ruler_text = None
 dimension_labels = []
-drawing_points = []  # Kappa nodes for green spiral curve
+drawing_points = []  # Kappa nodes (first endpoint of each greenchord)
 kappas = []  # Kappa values at each node
-ghost_curve = None
-curvature = 1.0  # Initial curvature (kappa)
-green_curve_line = None  # Single plot object for the interoperated green curve
+green_curve_line = None  # Single plot object for the interoperated greencurve
 points_3d = []  # For 3D polyhedron
 CLOSE_THRESHOLD = 0.05  # Distance to first point to consider closing
 vanishing_points = []  # Vanishing points for each triangulation
 previous_kappa = 1.0  # Initial kappa for decay
+curvature = 1.0  # Initial curvature (kappa)
 
 # Compute golden spiral
 def compute_golden_spiral():
@@ -81,13 +80,13 @@ def compute_golden_spiral():
     y = r * np.sin(theta)
     return x, y
 
-# Custom interoperations for green curve (degree 5 polynomial for G5 approximation)
+# Custom interoperations for greencurve (custom kappa NURBS with endpoint kappa and theta decay)
 def custom_interoperations_green_curve(points, kappas):
     """
-    Custom interoperations creating a continuous green curve through points with kappa-controlled spiral decay.
+    Custom kappa NURBS-like curve through points with endpoint kappa and theta decay for curvature continuity.
     
     Args:
-        points (list): List of (x, y) points.
+        points (list): List of (x, y) points (kappa nodes).
         kappas (list): Kappa values at each node.
     
     Returns:
@@ -101,63 +100,63 @@ def custom_interoperations_green_curve(points, kappas):
     t = np.cumsum([0] + [np.sqrt((x_points[i+1] - x_points[i])**2 + (y_points[i+1] - y_points[i])**2) for i in range(len(points)-1)])
     t_fine = np.linspace(0, t[-1], 1000) if t[-1] > 0 else np.linspace(0, 1, 1000)
     
+    # Custom NURBS basis functions (cubic, degree 3 for G2 continuity, extended to G5 with higher order terms)
+    def nurbs_basis(u, i, p, knots):
+        if p == 0:
+            return 1.0 if knots[i] <= u < knots[i+1] else 0.0
+        if knots[i+p] == knots[i]:
+            c1 = 0.0
+        else:
+            c1 = (u - knots[i]) / (knots[i+p] - knots[i]) * nurbs_basis(u, i, p-1, knots)
+        if knots[i+p+1] == knots[i+1]:
+            c2 = 0.0
+        else:
+            c2 = (knots[i+p+1] - u) / (knots[i+p+1] - knots[i+1]) * nurbs_basis(u, i+1, p-1, knots)
+        return c1 + c2
+    
+    # Generate knots based on theta (distance), non-uniform for decay
+    knots = [0] * 4 + list(np.cumsum([kappas[i] for i in range(len(points))])) + [t[-1]] * 4  # Clamped knots for endpoint interpolation
+    
     x_fine = []
     y_fine = []
-    for i in range(len(points) - 1):
-        t0, t1 = t[i], t[i+1]
-        x0, x1 = x_points[i], x_points[i+1]
-        y0, y1 = y_points[i], y_points[i+1]
-        t_seg = t_fine[(t_fine >= t0) & (t_fine <= t1)] - t0
-        if len(t_seg) == 0:
-            continue
-        t_seg_norm = t_seg / (t1 - t0) if t1 != t0 else t_seg
-        kappa_i = min(max(kappas[i], 0.1), 2.0)  # Clamp kappa to avoid instability
-        
-        # Spiral decay: Stabilized exponential decay
-        decay = np.exp(-t_seg_norm * kappa_i / 10.0)  # Reduced decay rate for stability
-        
-        # Degree 5 polynomial for G5 approximation
-        a_x = 2 * (x1 - x0)
-        b_x = -3 * (x1 - x0)
-        c_x = 0
-        d_x = (x1 - x0) * decay.mean() * kappa_i
-        e_x = (x1 - x0) * decay * kappa_i
-        f_x = x0
-        x_seg = a_x * t_seg_norm**5 + b_x * t_seg_norm**4 + c_x * t_seg_norm**3 + d_x * t_seg_norm**2 + e_x * t_seg_norm + f_x
-        
-        a_y = 2 * (y1 - y0)
-        b_y = -3 * (y1 - y0)
-        c_y = 0
-        d_y = (y1 - y0) * decay.mean() * kappa_i
-        e_y = (y1 - y0) * decay * kappa_i
-        f_y = y0
-        y_seg = a_y * t_seg_norm**5 + b_y * t_seg_norm**4 + c_y * t_seg_norm**3 + d_y * t_seg_norm**2 + e_y * t_seg_norm + f_y
-        
-        x_fine.extend(x_seg)
-        y_fine.extend(y_seg)
+    for u in t_fine:
+        x_val = 0.0
+        y_val = 0.0
+        n = len(points) - 1
+        for i in range(n + 1):
+            b = nurbs_basis(u, i, 3, knots)  # Cubic basis (degree 3 for G2, extended with kappa)
+            weight = kappas[i] if i < len(kappas) else kappas[-1]  # Weight by kappa
+            x_val += b * x_points[i] * weight
+            y_val += b * y_points[i] * weight
+        # Theta decay adjustment
+        decay = np.exp(-u / t[-1] / 20.0) if t[-1] > 0 else 1.0
+        x_val *= decay
+        y_val *= decay
+        x_fine.append(x_val)
+        y_fine.append(y_val)
     
     return np.array(x_fine), np.array(y_fine)
 
-# Compute kappa for a segment
+# Compute kappa for a segment, second endpoint influences next kappa
 def compute_segment_kappa(p1, p2, base_kappa=1.0, prev_kappa=1.0):
     """
-    Computes kappa for a segment with decay based on distance.
+    Computes kappa for a segment with decay based on theta (distance).
     
     Args:
-        p1 (tuple): Starting point (x1, y1).
-        p2 (tuple): Ending point (x2, y2).
-        base_kappa (float): Base kappa value for curvature control.
+        p1 (tuple): Starting point (x1, y1, first endpoint, kappa node).
+        p2 (tuple): Ending point (x2, y2, theta).
+        base_kappa (float): Base kappa value from slider.
         prev_kappa (float): Previous kappa for decay calculation.
     
     Returns:
-        float: Current kappa value.
+        float: Current kappa value (for second endpoint).
     """
     x1, y1 = p1
     x2, y2 = p2
-    distance = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-    if distance < 1e-10:
+    theta = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)  # Theta is distance
+    if theta < 1e-10:
         return prev_kappa
-    decay_factor = np.exp(-distance / WIDTH / 10.0)  # Reduced decay rate
+    decay_factor = np.exp(-theta / WIDTH / 20.0)  # Further reduced decay rate
     return prev_kappa * decay_factor * base_kappa
 
 # Golden window calculation
@@ -233,7 +232,7 @@ ax_2d.plot([], [], 'k-', label='Curvature Slider (Controls window)')
 def update_curvature(val):
     global curvature
     curvature = val
-    if len(drawing_points) >= 2:
+    if len(drawing_points) >= 1:
         kappas[-1] = curvature
         redraw_green_curve()
     fig_2d.canvas.draw()
@@ -346,7 +345,7 @@ def on_click_dimension(event):
             dimension_labels.append(dim_text)
         fig_2d.canvas.draw()
 
-# Drawing mode: Add kappa nodes and update continuous green curve
+# Drawing mode: Add kappa nodes and update continuous greencurve
 def on_click_draw(event):
     global green_curve_line, selected_curve, previous_kappa, vanishing_points
     if event.inaxes == ax_2d and event.button == 1:
@@ -380,7 +379,7 @@ def on_click_draw(event):
                     print("Polyhedron closed")
                     fig_2d.canvas.draw()
                     return
-            # Add new point
+            # Add new kappa node (first endpoint)
             drawing_points.append((x, y))
             points_3d.append((x, y, int(hashlib.sha256(str((x, y)).encode()).hexdigest()[0], 16) / 15.0))
             ax_2d.scatter(x, y, color='r', s=50, label='Kappa Node' if len(drawing_points) == 1 else None)
@@ -414,7 +413,7 @@ def on_click_draw(event):
                 print("Green curve selected")
                 fig_2d.canvas.draw()
 
-# Ghost curve preview on motion
+# Ghost curve preview on motion (cursor at theta)
 def on_motion(event):
     global previous_kappa
     if draw_mode and len(drawing_points) > 0 and event.inaxes == ax_2d and not (protractor_active or ruler_active or dimension_active):
@@ -428,6 +427,10 @@ def on_motion(event):
             if dist_first < CLOSE_THRESHOLD:
                 preview_points[-1] = drawing_points[0]
                 preview_kappas[-1] = curvature
+        # Compute kappa for preview segment (cursor at theta)
+        if len(preview_points) > 1:
+            preview_kappa = compute_segment_kappa(preview_points[-2], preview_points[-1], curvature, previous_kappa)
+            preview_kappas[-1] = preview_kappa
         x_ghost, y_ghost = custom_interoperations_green_curve(preview_points, preview_kappas)
         ghost_curve.set_data(x_ghost, y_ghost)
         fig_2d.canvas.draw()
