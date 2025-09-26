@@ -49,11 +49,6 @@ kappa = 1 / PHI
 A_SPIRAL = 0.01
 B_SPIRAL = np.log(PHI) / (np.pi / 2)
 
-# iPod model parameters (from ccm_52_curve.py)
-B_SPIRAL_BASE = 0.1
-K_BASE = 0.1
-ipod_hash_val = 0.5  # Default hash value for modulation
-
 # Global variables for interactive modes
 protractor_active = False
 ruler_active = False
@@ -76,7 +71,7 @@ CLOSE_THRESHOLD = 0.05  # Distance to first point to consider closing
 vanishing_points = []  # Vanishing points for each triangulation
 previous_kappa = 1.0  # Initial kappa for decay
 curvature = 1.0  # Initial curvature (kappa)
-ipod_3d = None  # iPod model in 3D
+ipod_surface = None  # iPod surface in 3D
 
 # Compute golden spiral
 def compute_golden_spiral():
@@ -215,7 +210,7 @@ ax_2d.plot([], [], ' ', label='R: Toggle draw mode')
 ax_2d.plot([], [], 'b--', label='A: Toggle protractor')
 ax_2d.plot([], [], 'c-', label='M: Toggle measure (ruler)')
 ax_2d.plot([], [], ' ', label='D: Toggle dimension')
-ax_2d.plot([], [], 'r-', label='C: Close polyhedron (manual)')
+ax_2d.plot([], [], 'r-', label='C: Auto close loop')
 ax_2d.plot([], [], ' ', label='Click near first point to close')
 ax_2d.plot([], [], ' ', label='Click to select curve')
 ax_2d.plot([], [], ' ', label='G: To construction geom')
@@ -332,10 +327,15 @@ def on_click_dimension(event):
         fig_2d.canvas.draw()
 # Drawing mode: Add kappa nodes and update continuous greencurve
 def on_click_draw(event):
-    global green_curve_line, selected_curve, previous_kappa, vanishing_points
+    global green_curve_line, selected_curve, previous_kappa, vanishing_points, ipod_3d
     if event.inaxes == ax_2d and event.button == 1:
         x, y = event.xdata, event.ydata
         if draw_mode and not (protractor_active or ruler_active or dimension_active):
+            # Remove iPod model when drawing begins
+            if ipod_3d:
+                ipod_3d.remove()
+                ipod_3d = None
+                fig_3d.canvas.draw()
             # Check if near first point to close
             if len(drawing_points) > 2:
                 dx_first = x - drawing_points[0][0]
@@ -519,18 +519,31 @@ ax_2d.legend(loc='center left', bbox_to_anchor=(1.0, 0.5), fontsize='small')
 ax_2d.grid(True)
 ax_2d.set_title('2D Drawing Tool on A3 Landscape with Continuous Green Curve')
 
-# Display iPod curve by default in 3D
-def display_ipod_curve():
-    global ipod_3d
-    theta = np.linspace(0, 2 * np.pi, 1000)
+# Display iPod surface by default in 3D
+def display_ipod_surface():
+    global ipod_surface
+    theta, phi = np.meshgrid(np.linspace(0, 2 * np.pi, 100), np.linspace(0, 2 * np.pi, 100))
     r = 0.5 + 0.2 * np.sin(6 * theta)
-    x = r * np.cos(theta)
-    y = r * np.sin(theta)
-    z = 0.1 * np.sin(12 * theta) * (1 + 0.5)
-    ipod_3d = ax_3d.plot(x, y, z, 'b-')[0]
-    ax_3d.set_title('3D iPod Curve (Curvature Continuous)')
+    X = r * np.cos(theta)
+    Y = r * np.sin(theta)
+    Z = 0.1 * np.sin(12 * theta) * (1 + 0.5) + phi / (2 * np.pi)
+    ipod_surface = ax_3d.plot_surface(X, Y, Z, cmap='viridis', alpha=0.5)
+    ax_3d.set_title('3D iPod Surface (Curvature Continuous)')
     fig_3d.canvas.draw()
 
-display_ipod_curve()  # Show iPod curve on load
+display_ipod_surface()  # Show iPod surface on load
+
+# Draw default iPod ellipse as green curve on 2D canvas
+def draw_default_ipod(canvas, color='green'):
+    points = np.array([[0,0], [1,0], [1,1], [0,1]])
+    radius = sum(ord(c) for c in 'ipod') % 150  # = 428 % 150 = 128
+    scaled = points * radius
+    theta = np.linspace(0, 2 * np.pi, 200)
+    x = radius * np.cos(theta) + WIDTH / 2
+    y = radius * 0.5 * np.sin(theta) + HEIGHT / 2  # Ellipse aspect
+    canvas.plot(x, y, color=color, linewidth=3)
+    canvas.axis('equal')
+
+draw_default_ipod(ax_2d)  # Draw default iPod ellipse on load
 
 plt.show()
