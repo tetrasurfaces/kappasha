@@ -25,7 +25,6 @@ import warnings
 from matplotlib import MatplotlibDeprecationWarning
 import struct
 import base64
-
 # Set precision for Decimal
 getcontext().prec = 28
 # Suppress warnings
@@ -38,7 +37,7 @@ unit_per_mm = 1.0 / 297 # Normalize to A3 short side
 scale_label = f"Scale: 1mm = {unit_per_mm:.5f} units (A3 short side = 297mm)"
 # Dreyfuss human factors: Optimal eye distance ~20 inches (508mm)
 EYE_DISTANCE = 500 * unit_per_mm # Normalized eye distance to viewport
-HORIZON_HEIGHT = HEIGHT * 0.5 # Default horizon /home/yeetbow/Desktop/paydirt/git/id_util_draw.pyline at half height
+HORIZON_HEIGHT = HEIGHT * 0.5 # Default horizon line at half height
 EYE_LINE = HORIZON_HEIGHT # Eye line coincides with horizon
 # Golden spiral parameters
 PHI = (1 + np.sqrt(5)) / 2
@@ -470,7 +469,7 @@ def reset_canvas(event):
         ax_3d.cla()
         current_vertices = None
         current_faces = None
-        display_ipod_surface()  # Reset to default
+        display_ipod_surface()
         print("Canvas reset")
         fig_2d.canvas.draw()
 # Compute curvature for continuity check
@@ -552,8 +551,8 @@ def export_stl():
     if current_vertices is None or current_faces is None:
         print("No model to export")
         return
-    stl_data = b'\x00' * 80  # Header
-    stl_data += struct.pack('<I', len(current_faces))  # Number of triangles
+    stl_data = b'\x00' * 80 # Header
+    stl_data += struct.pack('<I', len(current_faces)) # Number of triangles
     for face in current_faces:
         v1 = current_vertices[face[0]]
         v2 = current_vertices[face[1]]
@@ -563,7 +562,7 @@ def export_stl():
         stl_data += struct.pack('<3f', *v1)
         stl_data += struct.pack('<3f', *v2)
         stl_data += struct.pack('<3f', *v3)
-        stl_data += b'\x00\x00'  # Attribute byte count
+        stl_data += b'\x00\x00' # Attribute byte count
     filename = 'model.stl'
     with open(filename, 'wb') as f:
         f.write(stl_data)
@@ -588,14 +587,11 @@ def display_ipod_surface():
     ax_3d.set_title('3D iPod Projected Surface (Compound Curvature with End Caps)')
     fig_3d.canvas.draw()
 # Draw default iPod ellipse as green curve on 2D canvas
-def draw_default_ipod(ax, color='g-'):
-    num_control = 8
-    # Generate closed curve with one extra point
-    x, y = generate_ipod_curve_closed(num_points=num_control + 1)
-    # Slice to remove the last point, making it open
+def draw_default_ipod(ax, color='g'):
+    x, y = generate_ipod_curve_closed(num_points=9)
     x_control = x[:-1]
     y_control = y[:-1]
-    scale = 0.2  # Scale to fit page
+    scale = 0.6  # Scale for large curve
     x_control *= scale
     y_control *= scale
     x_control += WIDTH / 2
@@ -603,7 +599,7 @@ def draw_default_ipod(ax, color='g-'):
     points = list(zip(x_control, y_control))
     kappas_ipod = [1.0] * len(points)
     x_interp, y_interp = custom_interoperations_green_curve(points, kappas_ipod)
-    ax.plot(x_interp, y_interp, color, linewidth=3)
+    ax.plot(x_interp, y_interp, color=color, linewidth=3, linestyle='-')
 # Connect events
 fig_2d.canvas.mpl_connect('key_press_event', toggle_draw)
 fig_2d.canvas.mpl_connect('key_press_event', toggle_protractor)
