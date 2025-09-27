@@ -360,6 +360,11 @@ def on_click_draw(event):
                     ax_3d.set_title('3D User Model (Compound Curvature with End Caps)')
                     fig_3d.canvas.draw()
                     print("Polyhedron closed and 3D model generated")
+                    # Compute and print speeds for user generated curve
+                    print("User Generated Curve Speeds:")
+                    for i in range(len(x_curve)):
+                        speed = int(hashlib.sha256(f"{x_curve[i]}{y_curve[i]}".encode()).hexdigest()[-4:], 16) % 1000 / 1000.0
+                        print(f"Point {i}: ({x_curve[i]:.4f}, {y_curve[i]:.4f}), Speed: {speed:.4f}")
                     fig_2d.canvas.draw()
                     return
             # Add new kappa node (first endpoint)
@@ -530,7 +535,7 @@ def build_mesh(x_curve, y_curve, height=0.5, num_layers=20, num_points=None):
     top_base = (num_layers - 1) * n
     for i in range(n):
         next_i = (i + 1) % n
-        faces.append([center_top, top_base + next_i, top_base + i])  # Reversed for outward normal
+        faces.append([center_top, top_base + next_i, top_base + i]) # Reversed for outward normal
     # Convert to numpy
     vertices = np.array(vertices)
     # Add compound curvature modulation
@@ -591,7 +596,7 @@ def draw_default_ipod(ax, color='g'):
     x, y = generate_ipod_curve_closed(num_points=9)
     x_control = x[:-1]
     y_control = y[:-1]
-    scale = 0.6  # Scale for large curve
+    scale = 0.6 # Scale for large curve
     x_control *= scale
     y_control *= scale
     x_control += WIDTH / 2
@@ -600,6 +605,11 @@ def draw_default_ipod(ax, color='g'):
     kappas_ipod = [1.0] * len(points)
     x_interp, y_interp = custom_interoperations_green_curve(points, kappas_ipod)
     ax.plot(x_interp, y_interp, color=color, linewidth=3, linestyle='-')
+    # Compute and print speeds for default curve
+    print("Default Curve Speeds:")
+    for i in range(len(x_interp)):
+        speed = int(hashlib.sha256(f"{x_interp[i]}{y_interp[i]}".encode()).hexdigest()[-4:], 16) % 1000 / 1000.0
+        print(f"Point {i}: ({x_interp[i]:.4f}, {y_interp[i]:.4f}), Speed: {speed:.4f}")
 # Connect events
 fig_2d.canvas.mpl_connect('key_press_event', toggle_draw)
 fig_2d.canvas.mpl_connect('key_press_event', toggle_protractor)
