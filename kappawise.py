@@ -15,26 +15,31 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-def compute_kappa_grid(grid_size=100, spiral_params=(0.001, np.log((1 + np.sqrt(5))/2) / (np.pi / 2))):
+def compute_kappa_grid(grid_size=100, num_angles=36, spiral_params=(0.001, np.log((1 + np.sqrt(5))/2) / (np.pi / 2))):
     """
-    Pre-computes a grid of kappa (curvature) values based on spiral curvature field.
+    Pre-computes a 3D grid of kappa (curvature) values based on spiral intersections with angle layers.
    
     Args:
         grid_size (int): Size of the square grid (grid_size x grid_size).
+        num_angles (int): Number of angle layers for the third dimension.
         spiral_params (tuple): (A, B) for the logarithmic spiral r = A * exp(B * theta).
    
     Returns:
-        np.ndarray: 2D array of kappa values at grid points.
+        np.ndarray: 3D array of kappa values at grid points (grid_size, grid_size, num_angles).
     """
     A, B = spiral_params
     x = np.linspace(-1, 1, grid_size)
     y = np.linspace(-1, 1, grid_size)
-    X, Y = np.meshgrid(x, y)
-    r = np.sqrt(X**2 + Y**2) + 1e-10  # Avoid division by zero
-    kappa_grid = (B**2 + 1) / (r * (1 + B**2))
-    return kappa_grid
+    angles = np.linspace(0, 2*np.pi, num_angles)
+    kappa_grid_3d = np.zeros((grid_size, grid_size, num_angles))
+    for k in range(num_angles):
+        X, Y = np.meshgrid(x, y)
+        theta = np.arctan2(Y, X) + angles[k]
+        r = np.sqrt(X**2 + Y**2) + 1e-10
+        kappa_grid_3d[:, :, k] = (B**2 + 1) / (r * (1 + B**2))
+    return kappa_grid_3d
 # Example usage (for testing)
 if __name__ == "__main__":
     grid = compute_kappa_grid()
-    print("Kappa Grid Shape:", grid.shape)
-    print("Sample Kappa Values:", grid[50, 50])
+    print("3D Kappa Grid Shape:", grid.shape)
+    print("Sample Kappa Value:", grid[50, 50, 0])
