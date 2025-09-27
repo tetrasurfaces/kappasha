@@ -13,7 +13,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -24,31 +23,28 @@ import hashlib
 from decimal import Decimal, getcontext
 import warnings
 from matplotlib import MatplotlibDeprecationWarning
+import struct
+import base64
 
 # Set precision for Decimal
 getcontext().prec = 28
-
 # Suppress warnings
 warnings.filterwarnings("ignore", category=MatplotlibDeprecationWarning)
-
 # A3 landscape dimensions (normalized: width long side, height short side)
-WIDTH = 420 / 297  # A3 landscape: 420mm width, 297mm height, normalized height=1.0
+WIDTH = 420 / 297 # A3 landscape: 420mm width, 297mm height, normalized height=1.0
 HEIGHT = 1.0
-PURPLE_LINES = [1/3, 2/3]  # Dividers on the width
-unit_per_mm = 1.0 / 297  # Normalize to A3 short side
+PURPLE_LINES = [1/3, 2/3] # Dividers on the width
+unit_per_mm = 1.0 / 297 # Normalize to A3 short side
 scale_label = f"Scale: 1mm = {unit_per_mm:.5f} units (A3 short side = 297mm)"
-
-# Dreyfuss ergonomics: Optimal eye distance ~20 inches (508mm)
-EYE_DISTANCE = 500 * unit_per_mm  # Normalized eye distance to viewport
-HORIZON_HEIGHT = HEIGHT * 0.5  # Default horizon line at half height
-EYE_LINE = HORIZON_HEIGHT  # Eye line coincides with horizon
-
+# Dreyfuss human factors: Optimal eye distance ~20 inches (508mm)
+EYE_DISTANCE = 500 * unit_per_mm # Normalized eye distance to viewport
+HORIZON_HEIGHT = HEIGHT * 0.5 # Default horizon line at half height
+EYE_LINE = HORIZON_HEIGHT # Eye line coincides with horizon
 # Golden spiral parameters
 PHI = (1 + np.sqrt(5)) / 2
 kappa = 1 / PHI
-A_SPIRAL = 0.001  # Scaled down slightly from 0.01 to fit better
+A_SPIRAL = 0.001 # Scaled down slightly from 0.01 to fit better
 B_SPIRAL = np.log(PHI) / (np.pi / 2)
-
 # Global variables for interactive modes
 protractor_active = False
 ruler_active = False
@@ -63,16 +59,15 @@ ruler_points = []
 ruler_line = None
 ruler_text = None
 dimension_labels = []
-drawing_points = []  # Kappa nodes (first endpoint of each greenchord)
-kappas = []  # Kappa values at each node
-green_curve_line = None  # Single plot object for the interoperated greencurve
-points_3d = []  # For 3D polyhedron
-CLOSE_THRESHOLD = 0.05  # Distance to first point to consider closing
-vanishing_points = []  # Vanishing points for each triangulation
-previous_kappa = 1.0  # Initial kappa for decay
-curvature = 1.0  # Initial curvature (kappa)
-ipod_3d = None  # iPod model in 3D
-
+drawing_points = [] # Kappa nodes (first endpoint of each greenchord)
+kappas = [] # Kappa values at each node
+green_curve_line = None # Single plot object for the interoperated greencurve
+CLOSE_THRESHOLD = 0.05 # Distance to first point to consider closing
+vanishing_points = [] # Vanishing points for each triangulation
+previous_kappa = 1.0 # Initial kappa for decay
+curvature = 1.0 # Initial curvature (kappa)
+current_vertices = None
+current_faces = None
 # Compute golden spiral
 def compute_golden_spiral():
     theta = np.linspace(0, 10 * np.pi, 1000)
@@ -80,34 +75,33 @@ def compute_golden_spiral():
     x = r * np.cos(theta)
     y = r * np.sin(theta)
     # Scale down to fit within page bounds
-    scale_factor = min(WIDTH, HEIGHT) / (2 * np.max(np.abs([x, y]))) * 0.8  # 80% of max to fit comfortably
+    scale_factor = min(WIDTH, HEIGHT) / (2 * np.max(np.abs([x, y]))) * 0.8 # 80% of max to fit comfortably
     x *= scale_factor
     y *= scale_factor
     return x, y
-
 # Custom interoperations for greencurve (custom kappa NURBS with endpoint kappa and theta decay, upgraded to degree 5 for G4 approx G5)
 def custom_interoperations_green_curve(points, kappas):
     """
     Custom kappa NURBS-like curve through points with endpoint kappa and theta decay for curvature continuity.
-    
+   
     Args:
         points (list): List of (x, y) points (kappa nodes).
         kappas (list): Kappa values at each node.
-    
+   
     Returns:
         tuple: (x, y) arrays for the interoperated curve.
     """
     if len(points) < 2:
         return np.array([]), np.array([])
-    
+   
     x_points = [p[0] for p in points]
     y_points = [p[1] for p in points]
     t = np.cumsum([0] + [np.sqrt((x_points[i+1] - x_points[i])**2 + (y_points[i+1] - y_points[i])**2) for i in range(len(points)-1)])
     t_fine = np.linspace(0, t[-1], 1000) if t[-1] > 0 else np.linspace(0, 1, 1000)
-    
+   
     # Upgrade to degree 5 for higher continuity (G4, approximating G5)
     degree = 5
-    
+   
     # Custom NURBS basis functions (recursive for higher degree)
     def nurbs_basis(u, i, p, knots):
         if p == 0:
@@ -121,10 +115,10 @@ def custom_interoperations_green_curve(points, kappas):
         else:
             c2 = (knots[i+p+1] - u) / (knots[i+p+1] - knots[i+1]) * nurbs_basis(u, i+1, p-1, knots)
         return c1 + c2
-    
+   
     # Generate knots based on theta (distance), non-uniform for decay, adjusted for higher degree
-    knots = [0] * (degree + 1) + list(np.cumsum([kappas[i] for i in range(len(points))])) + [t[-1]] * (degree + 1)  # Clamped knots for endpoint interpolation
-    
+    knots = [0] * (degree + 1) + list(np.cumsum([kappas[i] for i in range(len(points))])) + [t[-1]] * (degree + 1) # Clamped knots for endpoint interpolation
+   
     x_fine = []
     y_fine = []
     for u in t_fine:
@@ -132,8 +126,8 @@ def custom_interoperations_green_curve(points, kappas):
         y_val = 0.0
         n = len(points) - 1
         for i in range(n + 1):
-            b = nurbs_basis(u, i, degree, knots)  # Higher degree basis
-            weight = kappas[i] if i < len(kappas) else kappas[-1]  # Weight by kappa
+            b = nurbs_basis(u, i, degree, knots) # Higher degree basis
+            weight = kappas[i] if i < len(kappas) else kappas[-1] # Weight by kappa
             x_val += b * x_points[i] * weight
             y_val += b * y_points[i] * weight
         # Theta decay adjustment
@@ -142,20 +136,19 @@ def custom_interoperations_green_curve(points, kappas):
         y_val *= decay
         x_fine.append(x_val)
         y_fine.append(y_val)
-    
+   
     return np.array(x_fine), np.array(y_fine)
-
 # Compute kappa for a segment, second endpoint influences next kappa
 def compute_segment_kappa(p1, p2, base_kappa=1.0, prev_kappa=1.0):
     """
     Computes kappa for a segment with decay based on theta (distance).
-   
+  
     Args:
         p1 (tuple): Starting point (x1, y1, first endpoint, kappa node).
         p2 (tuple): Ending point (x2, y2, theta).
         base_kappa (float): Base kappa value from slider.
         prev_kappa (float): Previous kappa for decay calculation.
-   
+  
     Returns:
         float: Current kappa value (for second endpoint).
     """
@@ -166,7 +159,6 @@ def compute_segment_kappa(p1, p2, base_kappa=1.0, prev_kappa=1.0):
         return prev_kappa
     decay_factor = np.exp(-theta / WIDTH / 20.0) # Further reduced decay rate
     return prev_kappa * decay_factor * base_kappa
-
 # Golden window calculation
 def compute_golden_window(x_spiral, y_spiral):
     idx_crossings = np.where(np.diff(np.sign(x_spiral - PURPLE_LINES[0] * WIDTH)))[0]
@@ -175,7 +167,6 @@ def compute_golden_window(x_spiral, y_spiral):
         y2 = y_spiral[idx_crossings[1]]
         return np.abs(y2 - y1), min(y1, y2), max(y1, y2)
     return 0, 0, 0
-
 # Compute vanishing point for a triangulation
 def compute_vanishing_point(tri_points, eye_distance=EYE_DISTANCE):
     mid_x = np.mean([p[0] for p in tri_points])
@@ -183,7 +174,6 @@ def compute_vanishing_point(tri_points, eye_distance=EYE_DISTANCE):
     vx = mid_x
     vy = HORIZON_HEIGHT + eye_distance * (mid_y - EYE_LINE) / WIDTH
     return vx, vy
-
 # Redraw green curve
 def redraw_green_curve():
     global green_curve_line
@@ -194,7 +184,6 @@ def redraw_green_curve():
         x_green, y_green = custom_interoperations_green_curve(drawing_points, kappas)
         green_curve_line, = ax_2d.plot(x_green, y_green, 'g-', label='Green Curve' if green_curve_line is None else None)
     fig_2d.canvas.draw()
-
 # Setup figures
 fig_2d = plt.figure(figsize=(14, 8))
 ax_2d = fig_2d.add_subplot(111)
@@ -203,7 +192,6 @@ ax_3d = fig_3d.add_subplot(111, projection='3d')
 fig_controls = plt.figure(figsize=(4, 6))
 ax_curvature = fig_controls.add_axes([0.2, 0.8, 0.6, 0.03])
 curvature_slider = Slider(ax_curvature, 'Curvature (kappa)', 0.1, 2.0, valinit=curvature)
-
 # Plot A3 page
 ax_2d.plot([0, WIDTH, WIDTH, 0, 0], [0, 0, HEIGHT, HEIGHT, 0], 'k-', label='A3 Landscape Page')
 for x in PURPLE_LINES:
@@ -229,6 +217,7 @@ ax_2d.plot([], [], ' ', label='Click to select curve')
 ax_2d.plot([], [], ' ', label='G: To construction geom')
 ax_2d.plot([], [], ' ', label='H: Hide/show')
 ax_2d.plot([], [], ' ', label='E: Reset canvas')
+ax_2d.plot([], [], ' ', label='S: Export STL')
 ax_2d.plot([], [], 'k-', label='Curvature Slider (Controls window)')
 # Update curvature
 def update_curvature(val):
@@ -340,7 +329,7 @@ def on_click_dimension(event):
         fig_2d.canvas.draw()
 # Drawing mode: Add kappa nodes and update continuous greencurve
 def on_click_draw(event):
-    global green_curve_line, selected_curve, previous_kappa, vanishing_points
+    global green_curve_line, selected_curve, previous_kappa, vanishing_points, current_vertices, current_faces
     if event.inaxes == ax_2d and event.button == 1:
         x, y = event.xdata, event.ydata
         if draw_mode and not (protractor_active or ruler_active or dimension_active):
@@ -354,31 +343,28 @@ def on_click_draw(event):
                     last_theta = np.sqrt((drawing_points[-1][0] - drawing_points[0][0])**2 + (drawing_points[-1][1] - drawing_points[0][1])**2)
                     decay_factor = np.exp(-last_theta / WIDTH / 20.0)
                     kappas[0] = kappas[-1] * decay_factor * curvature # Affect kappa1 with last kappa and decay
-                    redraw_green_curve()
                     drawing_points.append(drawing_points[0])
                     kappas.append(curvature)
-                    points_3d.append(points_3d[0])
-                    # Form 3D polyhedron
-                    tri_points = drawing_points[:-1]
-                    tri = []
-                    for i in range(len(tri_points) - 2):
-                        tri.append([i, i+1, i+2])
+                    redraw_green_curve()
+                    # Get closed curve
+                    x_curve, y_curve = green_curve_line.get_data()
+                    if np.hypot(x_curve[-1] - x_curve[0], y_curve[-1] - y_curve[0]) > 1e-5:
+                        x_curve = np.append(x_curve, x_curve[0])
+                        y_curve = np.append(y_curve, y_curve[0])
                     ax_3d.cla()
-                    verts = [[points_3d[i] for i in triangle] for triangle in tri]
-                    if verts:
-                        vanishing_points.append(compute_vanishing_point(verts[0]))
-                        ax_3d.add_collection3d(Poly3DCollection(verts, alpha=0.5, facecolors=cm.viridis(np.linspace(0, 1, len(verts)))))
+                    current_vertices, current_faces = build_mesh(x_curve, y_curve, num_points=50)
+                    verts = [[current_vertices[i] for i in f] for f in current_faces]
+                    ax_3d.add_collection3d(Poly3DCollection(verts, alpha=0.5, facecolors=cm.viridis(np.linspace(0, 1, len(verts)))))
                     ax_3d.set_xlabel('X')
                     ax_3d.set_ylabel('Y')
                     ax_3d.set_zlabel('Z')
-                    ax_3d.set_title('3D Polyhedron Model')
+                    ax_3d.set_title('3D User Model (Compound Curvature with End Caps)')
                     fig_3d.canvas.draw()
-                    print("Polyhedron closed")
+                    print("Polyhedron closed and 3D model generated")
                     fig_2d.canvas.draw()
                     return
             # Add new kappa node (first endpoint)
             drawing_points.append((x, y))
-            points_3d.append((x, y, int(hashlib.sha256(str((x, y)).encode()).hexdigest()[0], 16) / 15.0))
             ax_2d.scatter(x, y, color='r', s=50, label='Kappa Node' if len(drawing_points) == 1 else None)
             kappas.append(curvature)
             if len(drawing_points) > 1:
@@ -471,7 +457,7 @@ def hide_show(event):
         fig_2d.canvas.draw()
 # Reset canvas
 def reset_canvas(event):
-    global drawing_points, kappas, previous_kappa, green_curve_line, points_3d, vanishing_points, selected_curve
+    global drawing_points, kappas, previous_kappa, green_curve_line, vanishing_points, selected_curve, current_vertices, current_faces
     if event.key == 'e':
         drawing_points = []
         kappas = []
@@ -479,11 +465,12 @@ def reset_canvas(event):
         if green_curve_line:
             green_curve_line.remove()
             green_curve_line = None
-        points_3d = []
         vanishing_points = []
         selected_curve = None
         ax_3d.cla()
-        fig_3d.canvas.draw()
+        current_vertices = None
+        current_faces = None
+        display_ipod_surface()  # Reset to default
         print("Canvas reset")
         fig_2d.canvas.draw()
 # Compute curvature for continuity check
@@ -497,6 +484,126 @@ def compute_curvature(x, y, t):
     denominator = (dx_dt**2 + dy_dt**2)**1.5
     denominator = np.where(denominator == 0, 1e-10, denominator)
     return numerator / denominator
+# Generate base iPod curve (closed for boundary surface)
+def generate_ipod_curve_closed(num_points=100):
+    t = np.linspace(0, 2 * np.pi, num_points) # Full closed loop
+    r_x = 1.0 # Width
+    r_y = 1.5 # Height (taller than wide)
+    x = r_x * np.cos(t)
+    y = r_y * np.sin(t)
+    # Add rounding for iPod-like bezel (simple modulation)
+    x += 0.1 * np.sin(4 * t)
+    y += 0.1 * np.cos(4 * t)
+    return x, y
+# Build mesh for 3D model
+def build_mesh(x_curve, y_curve, height=0.5, num_layers=20, num_points=None):
+    if num_points is not None:
+        indices = np.linspace(0, len(x_curve) - 1, num_points, dtype=int)
+        x_curve = x_curve[indices]
+        y_curve = y_curve[indices]
+    vertices = []
+    faces = []
+    n = len(x_curve)
+    # Loft layers
+    for k in range(num_layers):
+        z = height * k / (num_layers - 1)
+        for i in range(n):
+            vertices.append([x_curve[i], y_curve[i], z])
+    # Side faces
+    for k in range(num_layers - 1):
+        for i in range(n):
+            next_i = (i + 1) % n
+            base = k * n
+            next_base = (k + 1) * n
+            faces.append([base + i, base + next_i, next_base + next_i])
+            faces.append([base + i, next_base + next_i, next_base + i])
+    # Bottom cap (fan triangulation from center)
+    center_bottom = len(vertices)
+    center_x = np.mean(x_curve)
+    center_y = np.mean(y_curve)
+    vertices.append([center_x, center_y, 0])
+    for i in range(n):
+        next_i = (i + 1) % n
+        faces.append([center_bottom, i, next_i])
+    # Top cap (fan triangulation from center)
+    center_top = len(vertices)
+    vertices.append([center_x, center_y, height])
+    top_base = (num_layers - 1) * n
+    for i in range(n):
+        next_i = (i + 1) % n
+        faces.append([center_top, top_base + next_i, top_base + i])  # Reversed for outward normal
+    # Convert to numpy
+    vertices = np.array(vertices)
+    # Add compound curvature modulation
+    vertices[:, 2] += 0.1 * np.sin(4 * np.pi * vertices[:, 0]) * np.cos(2 * np.pi * vertices[:, 1])
+    vertices[:, 0] += 0.05 * np.sin(2 * np.pi * vertices[:, 2])
+    vertices[:, 1] += 0.05 * np.cos(2 * np.pi * vertices[:, 2])
+    return vertices, faces
+# Function to compute normals
+def compute_normal(v1, v2, v3):
+    vec1 = v2 - v1
+    vec2 = v3 - v1
+    normal = np.cross(vec1, vec2)
+    norm = np.linalg.norm(normal)
+    return normal / norm if norm != 0 else normal
+# Export current model to STL
+def export_stl():
+    global current_vertices, current_faces
+    if current_vertices is None or current_faces is None:
+        print("No model to export")
+        return
+    stl_data = b'\x00' * 80  # Header
+    stl_data += struct.pack('<I', len(current_faces))  # Number of triangles
+    for face in current_faces:
+        v1 = current_vertices[face[0]]
+        v2 = current_vertices[face[1]]
+        v3 = current_vertices[face[2]]
+        normal = compute_normal(v1, v2, v3)
+        stl_data += struct.pack('<3f', *normal)
+        stl_data += struct.pack('<3f', *v1)
+        stl_data += struct.pack('<3f', *v2)
+        stl_data += struct.pack('<3f', *v3)
+        stl_data += b'\x00\x00'  # Attribute byte count
+    filename = 'model.stl'
+    with open(filename, 'wb') as f:
+        f.write(stl_data)
+    print(f"Saved to {filename}")
+    stl_base64 = base64.b64encode(stl_data).decode('utf-8')
+    print("Base64 STL:")
+    print(stl_base64)
+# Save STL on key press
+def save_stl(event):
+    if event.key == 's':
+        export_stl()
+# Display iPod surface by default in 3D with curvature continuous end caps
+def display_ipod_surface():
+    global current_vertices, current_faces
+    x_curve, y_curve = generate_ipod_curve_closed(50)
+    current_vertices, current_faces = build_mesh(x_curve, y_curve)
+    verts = [[current_vertices[i] for i in f] for f in current_faces]
+    ax_3d.add_collection3d(Poly3DCollection(verts, alpha=0.5, facecolors=cm.viridis(np.linspace(0, 1, len(verts)))))
+    ax_3d.set_xlabel('X')
+    ax_3d.set_ylabel('Y')
+    ax_3d.set_zlabel('Z')
+    ax_3d.set_title('3D iPod Projected Surface (Compound Curvature with End Caps)')
+    fig_3d.canvas.draw()
+# Draw default iPod ellipse as green curve on 2D canvas
+def draw_default_ipod(ax, color='g-'):
+    num_control = 8
+    # Generate closed curve with one extra point
+    x, y = generate_ipod_curve_closed(num_points=num_control + 1)
+    # Slice to remove the last point, making it open
+    x_control = x[:-1]
+    y_control = y[:-1]
+    scale = 0.2  # Scale to fit page
+    x_control *= scale
+    y_control *= scale
+    x_control += WIDTH / 2
+    y_control += HEIGHT / 2
+    points = list(zip(x_control, y_control))
+    kappas_ipod = [1.0] * len(points)
+    x_interp, y_interp = custom_interoperations_green_curve(points, kappas_ipod)
+    ax.plot(x_interp, y_interp, color, linewidth=3)
 # Connect events
 fig_2d.canvas.mpl_connect('key_press_event', toggle_draw)
 fig_2d.canvas.mpl_connect('key_press_event', toggle_protractor)
@@ -505,6 +612,7 @@ fig_2d.canvas.mpl_connect('key_press_event', toggle_dimension)
 fig_2d.canvas.mpl_connect('key_press_event', to_construction)
 fig_2d.canvas.mpl_connect('key_press_event', hide_show)
 fig_2d.canvas.mpl_connect('key_press_event', reset_canvas)
+fig_2d.canvas.mpl_connect('key_press_event', save_stl)
 fig_2d.canvas.mpl_connect('button_press_event', on_click_protractor)
 fig_2d.canvas.mpl_connect('button_press_event', on_click_ruler)
 fig_2d.canvas.mpl_connect('button_press_event', on_click_dimension)
@@ -518,79 +626,6 @@ ax_2d.set_aspect('equal')
 ax_2d.legend(loc='center left', bbox_to_anchor=(1.0, 0.5), fontsize='small')
 ax_2d.grid(True)
 ax_2d.set_title('2D Drawing Tool on A3 Landscape with Continuous Green Curve')
-# Display iPod surface by default in 3D with curvature continuous end caps
-def display_ipod_surface():
-    global ipod_3d
-    # Generate base iPod curve (closed for boundary surface)
-    def generate_ipod_curve_closed(num_points=100):
-        t = np.linspace(0, 2 * np.pi, num_points) # Full closed loop
-        r_x = 1.0 # Width
-        r_y = 1.5 # Height (taller than wide)
-        x = r_x * np.cos(t)
-        y = r_y * np.sin(t)
-        # Add rounding for iPod-like bezel (simple modulation)
-        x += 0.1 * np.sin(4 * t)
-        y += 0.1 * np.cos(4 * t)
-        return x, y
-    
-    x_curve, y_curve = generate_ipod_curve_closed()
-    
-    # Create projected surface (loft with single closed curve, orthogonal projection along Z)
-    u = np.linspace(0, 1, len(x_curve))
-    v = np.linspace(0, 1, 50) # Layers for depth
-    u_grid, v_grid = np.meshgrid(u, v)
-    
-    # Orthographic projection: replicate curve along Z (flat extrusion, but with compound curvature modulation)
-    X = np.tile(x_curve, (len(v), 1))
-    Y = np.tile(y_curve, (len(v), 1))
-    Z = v_grid * 0.5 # Depth along Z as normal
-    
-    # Add tri-dimensional compound curvature (modulate X, Y, Z)
-    Z += 0.1 * np.sin(4 * np.pi * u_grid) * np.cos(2 * np.pi * v_grid)
-    X += 0.05 * np.sin(2 * np.pi * v_grid)
-    Y += 0.05 * np.cos(2 * np.pi * v_grid)
-    
-    ipod_3d = ax_3d.plot_surface(X, Y, Z, cmap='viridis', alpha=0.5)
-    
-    # Add curvature continuous end caps using boundary fill with original curve
-    def create_cap(z_value, x_boundary, y_boundary):
-        # Fill the interior of the boundary curve (using polar-like interpolation for smooth fill)
-        num_radial = 20
-        num_angular = len(x_boundary)
-        r = np.linspace(0, 1, num_radial)
-        theta = np.linspace(0, 2 * np.pi, num_angular)
-        r_grid, theta_grid = np.meshgrid(r, theta)
-        
-        # Interpolate boundary to fill (approximate G5 by high-degree radial blend)
-        X_cap = r_grid * np.interp(theta_grid, np.linspace(0, 2 * np.pi, num_angular), x_boundary)
-        Y_cap = r_grid * np.interp(theta_grid, np.linspace(0, 2 * np.pi, num_angular), y_boundary)
-        Z_cap = np.ones_like(X_cap) * z_value
-        
-        # Blend curvature: modulate Z to match surface at edge
-        edge_mod = 0.1 * np.sin(4 * np.pi * theta_grid / (2 * np.pi))  # Match modulation
-        Z_cap += edge_mod * r_grid  # Fade modulation inward for continuity
-        
-        return X_cap.T, Y_cap.T, Z_cap.T  # Transpose for correct orientation
-    
-    # Bottom cap at z=0
-    X_bottom, Y_bottom, Z_bottom = create_cap(0, x_curve, y_curve)
-    ax_3d.plot_surface(X_bottom, Y_bottom, Z_bottom, cmap='viridis', alpha=0.5)
-    
-    # Top cap at z=0.5
-    X_top, Y_top, Z_top = create_cap(0.5, x_curve, y_curve)
-    ax_3d.plot_surface(X_top, Y_top, Z_top, cmap='viridis', alpha=0.5)
-    
-    ax_3d.set_title('3D iPod Projected Surface (Compound Curvature with End Caps)')
-    fig_3d.canvas.draw()
 display_ipod_surface() # Show iPod surface on load
-# Draw default iPod ellipse as green curve on 2D canvas
-def draw_default_ipod(canvas, color='green'):
-    points = np.array([[0,0], [1,0], [1,1], [0,1], [0,0]]) # Closed loop
-    radius = sum(ord(c) for c in 'ipod') % 150 # = 428 % 150 = 128
-    scaled_points = [(p[0] * radius + WIDTH / 2, p[1] * radius / 2 + HEIGHT / 2) for p in points] # Scaled and centered ellipse points
-    kappas_ipod = [1.0] * len(scaled_points) # Uniform kappas for simplicity
-    x, y = custom_interoperations_green_curve(scaled_points, kappas_ipod)
-    canvas.plot(x, y, color=color, linewidth=3)
-    canvas.axis('equal')
 draw_default_ipod(ax_2d) # Draw default iPod ellipse on load with G5 interoperations
 plt.show()
