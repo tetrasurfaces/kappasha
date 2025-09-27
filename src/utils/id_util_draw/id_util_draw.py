@@ -25,67 +25,7 @@ import warnings
 from matplotlib import MatplotlibDeprecationWarning
 import struct
 import base64
-
-def compute_kappa_grid(grid_size=100, num_angles=369, spiral_factor=0.1, compound_levels=3, decay_scale=None, spiral_params=(0.001, np.log((1 + np.sqrt(5))/2) / (np.pi / 2))):
-    """
-    Pre-computes a 3D grid of kappa (curvature) values based on compound spiral intersections with angle layers.
-    
-    This updated function integrates compound logarithmic spiral patterns with nested levels for even decay over space,
-    enhancing parametric modeling and enabling speed-over-curve driving in CMM/CAD/CAM. It combines the original spiral
-    parameters with compound sets (angles on angles) for multi-scale effects.
-    
-    Args:
-        grid_size (int): Size of the square grid (grid_size x grid_size).
-        num_angles (int): Number of angular slices (default 369 for slight overlap beyond 360 degrees).
-        spiral_factor (float): Controls the tightness of the compound spirals (b in log spiral r = exp(b * theta)).
-        compound_levels (int): Number of compound sets (nested spirals) for multi-scale decay.
-        decay_scale (float, optional): Scale for exponential decay (default grid_size / 2).
-        spiral_params (tuple): (A, B) for the base logarithmic spiral r = A * exp(B * theta) (original params preserved).
-    
-    Returns:
-        np.ndarray: 3D array of kappa values at grid points (grid_size, grid_size, num_angles).
-    """
-    if decay_scale is None:
-        decay_scale = grid_size / 2.0
-    
-    A, B_base = spiral_params  # Preserve original spiral params
-    kappa_grid_3d = np.zeros((grid_size, grid_size, num_angles))
-    cx, cy = grid_size / 2.0, grid_size / 2.0
-    
-    for k in range(num_angles):
-        base_theta_k = k * 2 * np.pi / num_angles  # Angle in radians, modulo 2π
-        
-        for i in range(grid_size):
-            for j in range(grid_size):
-                dx = j - cx
-                dy = i - cy
-                r = np.sqrt(dx**2 + dy**2) + 1e-10
-                if r < 1e-6:
-                    kappa_grid_3d[i, j, k] = 1.0  # Max kappa at center
-                    continue
-                
-                theta = np.arctan2(dy, dx)  # Base angle at position
-                kappa = 0.0
-                
-                # Compound sets: nested angles on angles with integrated original spiral modulation
-                current_theta = theta
-                for level in range(1, compound_levels + 1):
-                    scale = 1.0 / level  # Smaller scales for higher levels
-                    B_level = B_base * scale  # Scale base B for compound levels
-                    # Spiral modulation: compound by adding log(r)-based twist, incorporating original (B^2 + 1) / (r * (1 + B^2))
-                    spiral_theta = current_theta + np.log(1 + r * scale) / spiral_factor
-                    # Diff modulo 2π, centered around 0
-                    diff = (spiral_theta - base_theta_k) % (2 * np.pi) - np.pi
-                    # Gaussian around spiral arm + even exponential decay over r + original kappa formula
-                    level_kappa = np.exp(-diff**2 / (0.5 * scale)) * np.exp(-r / decay_scale) * ((B_level**2 + 1) / (r * (1 + B_level**2)))
-                    kappa += level_kappa
-                    
-                    # Next level: angle on angle (compound)
-                    current_theta = spiral_theta % (2 * np.pi)
-                
-                kappa_grid_3d[i, j, k] = kappa / compound_levels  # Normalize by levels
-    
-    return kappa_grid_3d
+from kappawise import compute_kappa_grid
 
 # Set precision for Decimal
 getcontext().prec = 28
@@ -143,65 +83,78 @@ def compute_golden_spiral():
     x *= scale_factor
     y *= scale_factor
     return x, y
-# Custom interoperations for greencurve (custom kappa NURBS with endpoint kappa and theta decay, upgraded to degree 5 for G4 approx G5)
-def custom_interoperations_green_curve(points, kappas):
+# NURBS basis function (from DRAFT)
+def nurbs_basis(u, i, p, knots):
+    if p == 0:
+        return 1.0 if knots[i] <= u <= knots[i+1] else 0.0 # Include = for end
+    if knots[i+p] == knots[i]:
+        c1 = 0.0
+    else:
+        c1 = (u - knots[i]) / (knots[i+p] - knots[i]) * nurbs_basis(u, i, p-1, knots)
+    if knots[i+p+1] == knots[i+1]:
+        c2 = 0.0
+    else:
+        c2 = (knots[i+p+1] - u) / (knots[i+p+1] - knots[i+1]) * nurbs_basis(u, i+1, p-1, knots)
+    return c1 + c2
+# Compute NURBS curve point (from DRAFT)
+def nurbs_curve_point(u, control_points, weights, p, knots):
+    n = len(control_points) - 1
+    x = 0.0
+    y = 0.0
+    denom = 0.0
+    for i in range(n + 1):
+        b = nurbs_basis(u, i, p, knots)
+        denom += b * weights[i]
+        x += b * weights[i] * control_points[i][0]
+        y += b * weights[i] * control_points[i][1]
+    if denom == 0:
+        return 0, 0
+    return x / denom, y / denom
+# Generate NURBS curve (from DRAFT, adapted for general points)
+def generate_nurbs_curve(points, weights, p, knots, num_points=1000):
+    u_min, u_max = knots[p], knots[-p-1]
+    u_values = np.linspace(u_min, u_max, num_points, endpoint=False)
+    curve = [nurbs_curve_point(u, points, weights, p, knots) for u in u_values]
+    curve.append(curve[0]) # Append first point for exact closure
+    return np.array(curve)
+# Custom interoperations for greencurve using NURBS with local kappa adjustment for closure
+def custom_interoperations_green_curve(points, kappas, is_closed=False):
     """
-    Custom kappa NURBS-like curve through points with endpoint kappa and theta decay for curvature continuity.
- 
-    Args:
-        points (list): List of (x, y) points (kappa nodes).
-        kappas (list): Kappa values at each node.
- 
-    Returns:
-        tuple: (x, y) arrays for the interoperated curve.
+    Custom NURBS curve with endpoint kappa and theta decay, using DRAFT NURBS for ellipse-like conditions on closure.
     """
     if len(points) < 2:
         return np.array([]), np.array([])
- 
-    x_points = [p[0] for p in points]
-    y_points = [p[1] for p in points]
-    t = np.cumsum([0] + [np.sqrt((x_points[i+1] - x_points[i])**2 + (y_points[i+1] - y_points[i])**2) for i in range(len(points)-1)])
-    t_fine = np.linspace(0, t[-1], 1000) if t[-1] > 0 else np.linspace(0, 1, 1000)
- 
-    # Upgrade to degree 5 for higher continuity (G4, approximating G5)
-    degree = 5
- 
-    # Custom NURBS basis functions (recursive for higher degree)
-    def nurbs_basis(u, i, p, knots):
-        if p == 0:
-            return 1.0 if knots[i] <= u < knots[i+1] else 0.0
-        if knots[i+p] == knots[i]:
-            c1 = 0.0
-        else:
-            c1 = (u - knots[i]) / (knots[i+p] - knots[i]) * nurbs_basis(u, i, p-1, knots)
-        if knots[i+p+1] == knots[i+1]:
-            c2 = 0.0
-        else:
-            c2 = (knots[i+p+1] - u) / (knots[i+p+1] - knots[i+1]) * nurbs_basis(u, i+1, p-1, knots)
-        return c1 + c2
- 
-    # Generate knots based on theta (distance), non-uniform for decay, adjusted for higher degree
-    knots = [0] * (degree + 1) + list(np.cumsum([kappas[i] for i in range(len(points))])) + [t[-1]] * (degree + 1) # Clamped knots for endpoint interpolation
- 
-    x_fine = []
-    y_fine = []
-    for u in t_fine:
-        x_val = 0.0
-        y_val = 0.0
-        n = len(points) - 1
-        for i in range(n + 1):
-            b = nurbs_basis(u, i, degree, knots) # Higher degree basis
-            weight = kappas[i] if i < len(kappas) else kappas[-1] # Weight by kappa
-            x_val += b * x_points[i] * weight
-            y_val += b * y_points[i] * weight
-        # Theta decay adjustment
-        decay = np.exp(-u / t[-1] / 20.0) if t[-1] > 0 else 1.0
-        x_val *= decay
-        y_val *= decay
-        x_fine.append(x_val)
-        y_fine.append(y_val)
- 
-    return np.array(x_fine), np.array(y_fine)
+    
+    # For closure, adjust weights for local kappa without affecting ends
+    if is_closed:
+        # Example adjustment: increase weight at a segment for local curvature change
+        kappas[1] = 1.5 * kappas[1]  # Adjust second weight, like in DRAFT
+    
+    # Use degree 2 for conics-like (ellipse conditions)
+    p = 2
+    # Generate knots: open for general, with multiples for closure if closed
+    n = len(points) - 1
+    if is_closed:
+        # For closed, use uniform knots with repeats for continuity
+        knots = np.linspace(0, 1, len(points) + p + 1)
+        knots = np.concatenate(([0] * p, knots, [1] * p))
+    else:
+        knots = np.linspace(0, 1, len(points) + p + 1)
+    
+    # Add theta decay: modulate weights by decay
+    t = np.cumsum([0] + [np.sqrt((points[i+1][0] - points[i][0])**2 + (points[i+1][1] - points[i][1])**2) for i in range(n)])
+    decay_factors = np.exp(-t / t[-1] / 20.0) if t[-1] > 0 else np.ones(len(points))
+    effective_weights = [kappas[i] * decay_factors[i] for i in range(len(points))]
+    
+    # Generate curve
+    curve = generate_nurbs_curve(points, effective_weights, p, knots)
+    x, y = curve[:, 0], curve[:, 1]
+    
+    # Inter-sum operations: after computing y, adjust x based on y (as per request)
+    x += 0.05 * y  # Example inter-sum: x changed based on y for coupled modulation
+    
+    return x, y
+
 # Compute kappa for a segment, second endpoint influences next kappa
 def compute_segment_kappa(p1, p2, base_kappa=1.0, prev_kappa=1.0):
     """
@@ -237,13 +190,13 @@ def compute_vanishing_point(tri_points, eye_distance=EYE_DISTANCE):
     vy = HORIZON_HEIGHT + eye_distance * (mid_y - EYE_LINE) / WIDTH
     return vx, vy
 # Redraw green curve
-def redraw_green_curve():
+def redraw_green_curve(is_closed=False):
     global green_curve_line
     if green_curve_line:
         green_curve_line.remove()
         green_curve_line = None
     if len(drawing_points) >= 2:
-        x_green, y_green = custom_interoperations_green_curve(drawing_points, kappas)
+        x_green, y_green = custom_interoperations_green_curve(drawing_points, kappas, is_closed=is_closed)
         green_curve_line, = ax_2d.plot(x_green, y_green, 'g-', label='Green Curve' if green_curve_line is None else None)
     fig_2d.canvas.draw()
 # Setup figures
@@ -394,13 +347,13 @@ def on_click_dimension(event):
 def generate_gcode(x, y, speeds, scale=297):
     """
     Generates simple G-code for linear moves along the curve with variable feedrates.
-   
+  
     Args:
         x (array): X coordinates (normalized).
         y (array): Y coordinates (normalized).
         speeds (list): Normalized speeds (0-1) for each point.
         scale (float): Scale factor to convert normalized units to mm (based on A3 height=297mm).
-   
+  
     Returns:
         str: G-code string.
     """
@@ -431,7 +384,7 @@ def on_click_draw(event):
                     kappas[0] = kappas[-1] * decay_factor * curvature # Affect kappa1 with last kappa and decay
                     drawing_points.append(drawing_points[0])
                     kappas.append(curvature)
-                    redraw_green_curve()
+                    redraw_green_curve(is_closed=True) # Use closed NURBS for ellipse conditions
                     # Get closed curve
                     x_curve, y_curve = green_curve_line.get_data()
                     if np.hypot(x_curve[-1] - x_curve[0], y_curve[-1] - y_curve[0]) > 1e-5:
@@ -595,12 +548,10 @@ def generate_ipod_curve_closed(num_points=100):
     x += 0.1 * np.sin(4 * t)
     y += 0.1 * np.cos(4 * t)
     return x, y
-# Build mesh for 3D model (reconsidered surface: curve as parting line, clamshell loft in both directions with continuous curvature, curve-driven profile for caps)
+# Build mesh for 3D model (reconsidered: two surfaces with vertical edge relation at curve, inheriting curvature across)
 def build_mesh(x_curve, y_curve, height=0.5, num_rings=20, num_points=None):
     """
-    Builds a 3D mesh treating the input curve as a parting line, lofting symmetrically inward in both directions 
-    with a curve-driven profile (s**3 for G2 continuity at the boundary) to form a clamshell model. The caps are 
-    radial lofts considerate of orthographic projections for smooth appearance in XY, XZ, YZ views.
+    Builds two surfaces meeting at the curve with vertical tangent, inheriting each other's curvature in transition.
     """
     if num_points is not None:
         indices = np.linspace(0, len(x_curve) - 1, num_points, dtype=int)
@@ -611,18 +562,18 @@ def build_mesh(x_curve, y_curve, height=0.5, num_rings=20, num_points=None):
     center_y = np.mean(y_curve)
     vertices = []
     faces = []
-    
-    # Boundary ring at z=0 (shared parting line)
-    boundary_base = len(vertices)
+   
+    # Parting line at z=0
+    parting_base = len(vertices)
     for i in range(n):
         vertices.append([x_curve[i], y_curve[i], 0.0])
-    
-    # Upper loft: inward rings and center
-    upper_bases = [boundary_base]
+   
+    # Upper surface: rings inward with vertical tangent at edge (scale=1-s^2, g= (height/2) * (2s - s^2))
+    upper_bases = [parting_base]
     for l in range(1, num_rings):
         s = l / (num_rings - 1.0)
-        scale = 1 - s**2  # b=2 for dr/ds=0 at s=0 (vertical tangent)
-        g_val = (height / 2) * (2*s - s**2)  # Parabola profile, dz/ds = h (1-s), non-zero at s=0
+        scale = 1 - s**2  # Vertical tangent at s=0 (dr/ds=0)
+        g_val = (height / 2) * (2 * s - s**2)  # Inherited curvature (parabola, matching lower)
         base = len(vertices)
         upper_bases.append(base)
         for i in range(n):
@@ -634,13 +585,13 @@ def build_mesh(x_curve, y_curve, height=0.5, num_rings=20, num_points=None):
             vertices.append([x, y, z])
     center_upper = len(vertices)
     vertices.append([center_x, center_y, height / 2])
-    
-    # Lower loft: inward rings and center (mirrored)
-    lower_bases = [boundary_base]  # Share boundary
+   
+    # Lower surface: mirrored rings with same profile (inherits upper's curvature)
+    lower_bases = [parting_base]  # Shared edge
     for l in range(1, num_rings):
         s = l / (num_rings - 1.0)
         scale = 1 - s**2
-        g_val = (height / 2) * (2*s - s**2)
+        g_val = (height / 2) * (2 * s - s**2)  # Same as upper for inherited constant curvature
         base = len(vertices)
         lower_bases.append(base)
         for i in range(n):
@@ -648,12 +599,12 @@ def build_mesh(x_curve, y_curve, height=0.5, num_rings=20, num_points=None):
             vec_y = y_curve[i] - center_y
             x = center_x + scale * vec_x
             y = center_y + scale * vec_y
-            z = -g_val
+            z = -g_val  # Mirrored
             vertices.append([x, y, z])
     center_lower = len(vertices)
     vertices.append([center_x, center_y, -height / 2])
-    
-    # Faces for upper loft
+   
+    # Faces for upper surface
     for ll in range(len(upper_bases) - 1):
         base = upper_bases[ll]
         next_base = upper_bases[ll + 1]
@@ -661,13 +612,13 @@ def build_mesh(x_curve, y_curve, height=0.5, num_rings=20, num_points=None):
             next_i = (i + 1) % n
             faces.append([base + i, base + next_i, next_base + next_i])
             faces.append([base + i, next_base + next_i, next_base + i])
-    # Upper fan
+    # Upper cap fan with curvature inheritance
     base = upper_bases[-1]
     for i in range(n):
         next_i = (i + 1) % n
         faces.append([center_upper, base + next_i, base + i])
-    
-    # Faces for lower loft (order for normals)
+   
+    # Faces for lower surface
     for ll in range(len(lower_bases) - 1):
         base = lower_bases[ll]
         next_base = lower_bases[ll + 1]
@@ -675,15 +626,15 @@ def build_mesh(x_curve, y_curve, height=0.5, num_rings=20, num_points=None):
             next_i = (i + 1) % n
             faces.append([base + i, next_base + i, next_base + next_i])
             faces.append([base + i, next_base + next_i, base + next_i])
-    # Lower fan
+    # Lower cap fan with curvature inheritance
     base = lower_bases[-1]
     for i in range(n):
         next_i = (i + 1) % n
         faces.append([center_lower, base + i, base + next_i])
-    
+   
     # Convert to numpy array
     vertices = np.array(vertices)
-    
+   
     # Add compound curvature modulation with angle and 3D kappa grid for smooth orthographic projections
     grid_size, _, num_angles = kappa_grid.shape
     angle_idx = int((last_angle / 360) * num_angles) % num_angles
@@ -693,10 +644,10 @@ def build_mesh(x_curve, y_curve, height=0.5, num_rings=20, num_points=None):
     norm_x = np.clip(((vertices[:, 0] / max_dim) + 1) / 2 * (grid_size - 1), 0, grid_size - 1).astype(int)
     norm_y = np.clip(((vertices[:, 1] / max_dim) + 1) / 2 * (grid_size - 1), 0, grid_size - 1).astype(int)
     kappa_mod = kappa_slice[norm_y, norm_x]
-    vertices[:, 2] += kappa_mod * 0.1  # Scale z modulation
-    vertices[:, 0] += kappa_mod * 0.05 * np.sin(2 * np.pi * vertices[:, 2] / height)  # Compound in x
-    vertices[:, 1] += kappa_mod * 0.05 * np.cos(2 * np.pi * vertices[:, 2] / height)  # Compound in y
-    
+    vertices[:, 2] += kappa_mod * 0.1 # Scale z modulation
+    vertices[:, 0] += kappa_mod * 0.05 * np.sin(2 * np.pi * vertices[:, 2] / height) # Compound in x
+    vertices[:, 1] += kappa_mod * 0.05 * np.cos(2 * np.pi * vertices[:, 2] / height) # Compound in y
+   
     return vertices, faces
 # Function to compute normals
 def compute_normal(v1, v2, v3):
