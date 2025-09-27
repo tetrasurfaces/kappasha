@@ -25,6 +25,7 @@ import warnings
 from matplotlib import MatplotlibDeprecationWarning
 import struct
 import base64
+
 # Set precision for Decimal
 getcontext().prec = 28
 # Suppress warnings
@@ -37,7 +38,7 @@ unit_per_mm = 1.0 / 297 # Normalize to A3 short side
 scale_label = f"Scale: 1mm = {unit_per_mm:.5f} units (A3 short side = 297mm)"
 # Dreyfuss human factors: Optimal eye distance ~20 inches (508mm)
 EYE_DISTANCE = 500 * unit_per_mm # Normalized eye distance to viewport
-HORIZON_HEIGHT = HEIGHT * 0.5 # Default horizon line at half height
+HORIZON_HEIGHT = HEIGHT * 0.5 # Default horizon /home/yeetbow/Desktop/paydirt/git/id_util_draw.pyline at half height
 EYE_LINE = HORIZON_HEIGHT # Eye line coincides with horizon
 # Golden spiral parameters
 PHI = (1 + np.sqrt(5)) / 2
@@ -61,7 +62,6 @@ dimension_labels = []
 drawing_points = [] # Kappa nodes (first endpoint of each greenchord)
 kappas = [] # Kappa values at each node
 green_curve_line = None # Single plot object for the interoperated greencurve
-points_3d = [] # For 3D polyhedron
 CLOSE_THRESHOLD = 0.05 # Distance to first point to consider closing
 vanishing_points = [] # Vanishing points for each triangulation
 previous_kappa = 1.0 # Initial kappa for decay
@@ -343,33 +343,28 @@ def on_click_draw(event):
                     last_theta = np.sqrt((drawing_points[-1][0] - drawing_points[0][0])**2 + (drawing_points[-1][1] - drawing_points[0][1])**2)
                     decay_factor = np.exp(-last_theta / WIDTH / 20.0)
                     kappas[0] = kappas[-1] * decay_factor * curvature # Affect kappa1 with last kappa and decay
-                    redraw_green_curve()
                     drawing_points.append(drawing_points[0])
                     kappas.append(curvature)
-                    points_3d.append(points_3d[0])
-                    # Form 3D polyhedron
-                    tri_points = drawing_points[:-1]
-                    tri = []
-                    for i in range(len(tri_points) - 2):
-                        tri.append([i, i+1, i+2])
+                    redraw_green_curve()
+                    # Get closed curve
+                    x_curve, y_curve = green_curve_line.get_data()
+                    if np.hypot(x_curve[-1] - x_curve[0], y_curve[-1] - y_curve[0]) > 1e-5:
+                        x_curve = np.append(x_curve, x_curve[0])
+                        y_curve = np.append(y_curve, y_curve[0])
                     ax_3d.cla()
-                    current_vertices = np.array(points_3d[:-1])
-                    current_faces = tri
-                    verts = [[points_3d[i] for i in triangle] for triangle in tri]
-                    if verts:
-                        vanishing_points.append(compute_vanishing_point(verts[0]))
-                        ax_3d.add_collection3d(Poly3DCollection(verts, alpha=0.5, facecolors=cm.viridis(np.linspace(0, 1, len(verts)))))
+                    current_vertices, current_faces = build_mesh(x_curve, y_curve, num_points=50)
+                    verts = [[current_vertices[i] for i in f] for f in current_faces]
+                    ax_3d.add_collection3d(Poly3DCollection(verts, alpha=0.5, facecolors=cm.viridis(np.linspace(0, 1, len(verts)))))
                     ax_3d.set_xlabel('X')
                     ax_3d.set_ylabel('Y')
                     ax_3d.set_zlabel('Z')
-                    ax_3d.set_title('3D Polyhedron Model')
+                    ax_3d.set_title('3D User Model (Compound Curvature with End Caps)')
                     fig_3d.canvas.draw()
-                    print("Polyhedron closed")
+                    print("Polyhedron closed and 3D model generated")
                     fig_2d.canvas.draw()
                     return
             # Add new kappa node (first endpoint)
             drawing_points.append((x, y))
-            points_3d.append((x, y, int(hashlib.sha256(str((x, y)).encode()).hexdigest()[0], 16) / 15.0))
             ax_2d.scatter(x, y, color='r', s=50, label='Kappa Node' if len(drawing_points) == 1 else None)
             kappas.append(curvature)
             if len(drawing_points) > 1:
@@ -462,7 +457,7 @@ def hide_show(event):
         fig_2d.canvas.draw()
 # Reset canvas
 def reset_canvas(event):
-    global drawing_points, kappas, previous_kappa, green_curve_line, points_3d, vanishing_points, selected_curve, current_vertices, current_faces
+    global drawing_points, kappas, previous_kappa, green_curve_line, vanishing_points, selected_curve, current_vertices, current_faces
     if event.key == 'e':
         drawing_points = []
         kappas = []
@@ -470,13 +465,12 @@ def reset_canvas(event):
         if green_curve_line:
             green_curve_line.remove()
             green_curve_line = None
-        points_3d = []
         vanishing_points = []
         selected_curve = None
         ax_3d.cla()
         current_vertices = None
         current_faces = None
-        display_ipod_surface()
+        display_ipod_surface()  # Reset to default
         print("Canvas reset")
         fig_2d.canvas.draw()
 # Compute curvature for continuity check
@@ -490,6 +484,61 @@ def compute_curvature(x, y, t):
     denominator = (dx_dt**2 + dy_dt**2)**1.5
     denominator = np.where(denominator == 0, 1e-10, denominator)
     return numerator / denominator
+# Generate base iPod curve (closed for boundary surface)
+def generate_ipod_curve_closed(num_points=100):
+    t = np.linspace(0, 2 * np.pi, num_points) # Full closed loop
+    r_x = 1.0 # Width
+    r_y = 1.5 # Height (taller than wide)
+    x = r_x * np.cos(t)
+    y = r_y * np.sin(t)
+    # Add rounding for iPod-like bezel (simple modulation)
+    x += 0.1 * np.sin(4 * t)
+    y += 0.1 * np.cos(4 * t)
+    return x, y
+# Build mesh for 3D model
+def build_mesh(x_curve, y_curve, height=0.5, num_layers=20, num_points=None):
+    if num_points is not None:
+        indices = np.linspace(0, len(x_curve) - 1, num_points, dtype=int)
+        x_curve = x_curve[indices]
+        y_curve = y_curve[indices]
+    vertices = []
+    faces = []
+    n = len(x_curve)
+    # Loft layers
+    for k in range(num_layers):
+        z = height * k / (num_layers - 1)
+        for i in range(n):
+            vertices.append([x_curve[i], y_curve[i], z])
+    # Side faces
+    for k in range(num_layers - 1):
+        for i in range(n):
+            next_i = (i + 1) % n
+            base = k * n
+            next_base = (k + 1) * n
+            faces.append([base + i, base + next_i, next_base + next_i])
+            faces.append([base + i, next_base + next_i, next_base + i])
+    # Bottom cap (fan triangulation from center)
+    center_bottom = len(vertices)
+    center_x = np.mean(x_curve)
+    center_y = np.mean(y_curve)
+    vertices.append([center_x, center_y, 0])
+    for i in range(n):
+        next_i = (i + 1) % n
+        faces.append([center_bottom, i, next_i])
+    # Top cap (fan triangulation from center)
+    center_top = len(vertices)
+    vertices.append([center_x, center_y, height])
+    top_base = (num_layers - 1) * n
+    for i in range(n):
+        next_i = (i + 1) % n
+        faces.append([center_top, top_base + next_i, top_base + i])  # Reversed for outward normal
+    # Convert to numpy
+    vertices = np.array(vertices)
+    # Add compound curvature modulation
+    vertices[:, 2] += 0.1 * np.sin(4 * np.pi * vertices[:, 0]) * np.cos(2 * np.pi * vertices[:, 1])
+    vertices[:, 0] += 0.05 * np.sin(2 * np.pi * vertices[:, 2])
+    vertices[:, 1] += 0.05 * np.cos(2 * np.pi * vertices[:, 2])
+    return vertices, faces
 # Function to compute normals
 def compute_normal(v1, v2, v3):
     vec1 = v2 - v1
@@ -503,22 +552,24 @@ def export_stl():
     if current_vertices is None or current_faces is None:
         print("No model to export")
         return
-    stl_data = b'\x00' * 80 # Header
-    stl_data += struct.pack('<I', len(current_faces)) # Number of triangles
+    stl_data = b'\x00' * 80  # Header
+    stl_data += struct.pack('<I', len(current_faces))  # Number of triangles
     for face in current_faces:
-        v1, v2, v3 = current_vertices[face[0]], current_vertices[face[1]], current_vertices[face[2]]
+        v1 = current_vertices[face[0]]
+        v2 = current_vertices[face[1]]
+        v3 = current_vertices[face[2]]
         normal = compute_normal(v1, v2, v3)
         stl_data += struct.pack('<3f', *normal)
         stl_data += struct.pack('<3f', *v1)
         stl_data += struct.pack('<3f', *v2)
         stl_data += struct.pack('<3f', *v3)
-        stl_data += b'\x00\x00' # Attribute byte count
-    # Save to file
-    with open('model.stl', 'wb') as f:
+        stl_data += b'\x00\x00'  # Attribute byte count
+    filename = 'model.stl'
+    with open(filename, 'wb') as f:
         f.write(stl_data)
-    print("Saved to model.stl")
-    # Base64 encode for online processing
+    print(f"Saved to {filename}")
     stl_base64 = base64.b64encode(stl_data).decode('utf-8')
+    print("Base64 STL:")
     print(stl_base64)
 # Save STL on key press
 def save_stl(event):
@@ -527,129 +578,32 @@ def save_stl(event):
 # Display iPod surface by default in 3D with curvature continuous end caps
 def display_ipod_surface():
     global current_vertices, current_faces
-    # Generate base iPod curve (closed for boundary surface)
-    def generate_ipod_curve_closed(num_points=100):
-        t = np.linspace(0, 2 * np.pi, num_points) # Full closed loop
-        r_x = 1.0 # Width
-        r_y = 1.5 # Height (taller than wide)
-        x = r_x * np.cos(t)
-        y = r_y * np.sin(t)
-        # Add rounding for iPod-like bezel (simple modulation)
-        x += 0.1 * np.sin(4 * t)
-        y += 0.1 * np.cos(4 * t)
-        return x, y
-   
-    x_curve, y_curve = generate_ipod_curve_closed(100)
-   
-    # Create projected surface (loft with single closed curve, orthogonal projection along Z)
-    num_u = len(x_curve)  # 100
-    num_v = 50  # Layers for depth
-    u = np.linspace(0, 1, num_u)
-    v = np.linspace(0, 1, num_v)
-    u_grid, v_grid = np.meshgrid(u, v)
-   
-    # Orthographic projection: replicate curve along Z (flat extrusion, but with compound curvature modulation)
-    X = np.tile(x_curve, (num_v, 1))
-    Y = np.tile(y_curve, (num_v, 1))
-    Z = v_grid * 0.5 # Depth along Z as normal
-   
-    # Add tri-dimensional compound curvature (modulate X, Y, Z)
-    Z += 0.1 * np.sin(4 * np.pi * u_grid) * np.cos(2 * np.pi * v_grid)
-    X += 0.05 * np.sin(2 * np.pi * v_grid)
-    Y += 0.05 * np.cos(2 * np.pi * v_grid)
-   
-    vertices_side = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
-   
-    faces_side = []
-    for i in range(num_v - 1):
-        for j in range(num_u):
-            j1 = (j + 1) % num_u
-            p00 = i * num_u + j
-            p01 = i * num_u + j1
-            p10 = (i + 1) * num_u + j
-            p11 = (i + 1) * num_u + j1
-            faces_side.append([p00, p01, p11])
-            faces_side.append([p00, p11, p10])
-   
-    # Add curvature continuous end caps using boundary fill with original curve
-    def create_cap(z_value, x_boundary, y_boundary):
-        # Fill the interior of the boundary curve (using polar-like interpolation for smooth fill)
-        num_radial = 20
-        num_angular = len(x_boundary)
-        r = np.linspace(0, 1, num_radial)
-        theta = np.linspace(0, 2 * np.pi, num_angular)
-        r_grid, theta_grid = np.meshgrid(r, theta)
-       
-        # Interpolate boundary to fill (approximate G5 by high-degree radial blend)
-        X_cap = r_grid * np.interp(theta_grid, theta, x_boundary)
-        Y_cap = r_grid * np.interp(theta_grid, theta, y_boundary)
-        Z_cap = np.ones_like(X_cap) * z_value
-       
-        # Blend curvature: modulate Z to match surface at edge
-        edge_mod = 0.1 * np.sin(4 * np.pi * theta_grid / (2 * np.pi)) # Match modulation
-        Z_cap += edge_mod * r_grid # Fade modulation inward for continuity
-       
-        return X_cap, Y_cap, Z_cap  # No transpose, shape (num_angular, num_radial) = (100,20)
-   
-    # Bottom cap at z=0
-    X_bottom, Y_bottom, Z_bottom = create_cap(0, x_curve, y_curve)
-   
-    vertices_bottom = np.column_stack((X_bottom.ravel(), Y_bottom.ravel(), Z_bottom.ravel()))
-   
-    faces_bottom = []
-    num_rad = 20
-    num_ang = 100
-    for r in range(num_rad - 1):
-        for th in range(num_ang):
-            th1 = (th + 1) % num_ang
-            p00 = th * num_rad + r
-            p01 = th1 * num_rad + r
-            p10 = th * num_rad + (r + 1)
-            p11 = th1 * num_rad + (r + 1)
-            faces_bottom.append([p00, p01, p11])
-            faces_bottom.append([p00, p11, p10])
-   
-    # Top cap at z=0.5
-    X_top, Y_top, Z_top = create_cap(0.5, x_curve, y_curve)
-   
-    vertices_top = np.column_stack((X_top.ravel(), Y_top.ravel(), Z_top.ravel()))
-   
-    faces_top = []
-    for r in range(num_rad - 1):
-        for th in range(num_ang):
-            th1 = (th + 1) % num_ang
-            p00 = th * num_rad + r
-            p01 = th1 * num_rad + r
-            p10 = th * num_rad + (r + 1)
-            p11 = th1 * num_rad + (r + 1)
-            faces_top.append([p00, p10, p11])  # Reversed for outward normal
-            faces_top.append([p00, p11, p01])
-   
-    # Concatenate
-    offset_bottom = len(vertices_side)
-    offset_top = offset_bottom + len(vertices_bottom)
-    current_vertices = np.concatenate((vertices_side, vertices_bottom, vertices_top))
-    current_faces = faces_side + [[f[0] + offset_bottom, f[1] + offset_bottom, f[2] + offset_bottom] for f in faces_bottom] + [[f[0] + offset_top, f[1] + offset_top, f[2] + offset_top] for f in faces_top]
-   
-    # Visualize
+    x_curve, y_curve = generate_ipod_curve_closed(50)
+    current_vertices, current_faces = build_mesh(x_curve, y_curve)
     verts = [[current_vertices[i] for i in f] for f in current_faces]
     ax_3d.add_collection3d(Poly3DCollection(verts, alpha=0.5, facecolors=cm.viridis(np.linspace(0, 1, len(verts)))))
-   
     ax_3d.set_xlabel('X')
     ax_3d.set_ylabel('Y')
     ax_3d.set_zlabel('Z')
     ax_3d.set_title('3D iPod Projected Surface (Compound Curvature with End Caps)')
     fig_3d.canvas.draw()
-display_ipod_surface() # Show iPod surface on load
 # Draw default iPod ellipse as green curve on 2D canvas
-def draw_default_ipod(canvas, color='green'):
-    points = np.array([[0,0], [1,0], [1,1], [0,1], [0,0]]) # Closed loop
-    radius = sum(ord(c) for c in 'ipod') % 150 # = 428 % 150 = 128
-    scaled_points = [(p[0] * radius * unit_per_mm + WIDTH / 2, p[1] * radius / 2 * unit_per_mm + HEIGHT / 2) for p in points] # Scaled and centered ellipse points, using unit_per_mm to fit
-    kappas_ipod = [1.0] * len(scaled_points) # Uniform kappas for simplicity
-    x, y = custom_interoperations_green_curve(scaled_points, kappas_ipod)
-    canvas.plot(x, y, color=color, linewidth=3)
-draw_default_ipod(ax_2d) # Draw default iPod ellipse on load with G5 interoperations
+def draw_default_ipod(ax, color='g-'):
+    num_control = 8
+    # Generate closed curve with one extra point
+    x, y = generate_ipod_curve_closed(num_points=num_control + 1)
+    # Slice to remove the last point, making it open
+    x_control = x[:-1]
+    y_control = y[:-1]
+    scale = 0.2  # Scale to fit page
+    x_control *= scale
+    y_control *= scale
+    x_control += WIDTH / 2
+    y_control += HEIGHT / 2
+    points = list(zip(x_control, y_control))
+    kappas_ipod = [1.0] * len(points)
+    x_interp, y_interp = custom_interoperations_green_curve(points, kappas_ipod)
+    ax.plot(x_interp, y_interp, color, linewidth=3)
 # Connect events
 fig_2d.canvas.mpl_connect('key_press_event', toggle_draw)
 fig_2d.canvas.mpl_connect('key_press_event', toggle_protractor)
@@ -672,4 +626,6 @@ ax_2d.set_aspect('equal')
 ax_2d.legend(loc='center left', bbox_to_anchor=(1.0, 0.5), fontsize='small')
 ax_2d.grid(True)
 ax_2d.set_title('2D Drawing Tool on A3 Landscape with Continuous Green Curve')
+display_ipod_surface() # Show iPod surface on load
+draw_default_ipod(ax_2d) # Draw default iPod ellipse on load with G5 interoperations
 plt.show()
