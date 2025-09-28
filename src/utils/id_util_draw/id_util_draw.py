@@ -26,7 +26,6 @@ from matplotlib import MatplotlibDeprecationWarning
 import struct
 import base64
 from kappawise import compute_kappa_grid
-
 # Set precision for Decimal
 getcontext().prec = 28
 # Suppress warnings
@@ -65,6 +64,7 @@ dimension_labels = []
 drawing_points = [] # Kappa nodes (first endpoint of each greenchord)
 kappas = [] # Kappa values at each node
 node_scatter = [] # List of scatter objects for kappa nodes
+original_colors = [] # List to store original colors of nodes
 selected_node_index = -1
 dragging = False
 ghost_handles = [] # List for theta ghost handles
@@ -73,6 +73,7 @@ CLOSE_THRESHOLD = 0.05 # Distance to first point to consider closing
 vanishing_points = [] # Vanishing points for each triangulation
 previous_kappa = 1.0 # Initial kappa for decay
 curvature = 1.0 # Initial curvature (kappa)
+height = 0.5 # Initial height for 3D model
 current_vertices = None
 current_faces = None
 last_angle = 0.0 # Last measured angle from protractor
@@ -89,78 +90,62 @@ def compute_golden_spiral():
     x *= scale_factor
     y *= scale_factor
     return x, y
-# NURBS basis function (from DRAFT)
-def nurbs_basis(u, i, p, knots):
-    if p == 0:
-        return 1.0 if knots[i] <= u <= knots[i+1] else 0.0 # Include = for end
-    if knots[i+p] == knots[i]:
-        c1 = 0.0
-    else:
-        c1 = (u - knots[i]) / (knots[i+p] - knots[i]) * nurbs_basis(u, i, p-1, knots)
-    if knots[i+p+1] == knots[i+1]:
-        c2 = 0.0
-    else:
-        c2 = (knots[i+p+1] - u) / (knots[i+p+1] - knots[i+1]) * nurbs_basis(u, i+1, p-1, knots)
-    return c1 + c2
-# Compute NURBS curve point (from DRAFT)
-def nurbs_curve_point(u, control_points, weights, p, knots):
-    n = len(control_points) - 1
-    x = 0.0
-    y = 0.0
-    denom = 0.0
-    for i in range(n + 1):
-        b = nurbs_basis(u, i, p, knots)
-        denom += b * weights[i]
-        x += b * weights[i] * control_points[i][0]
-        y += b * weights[i] * control_points[i][1]
-    if denom == 0:
-        return 0, 0
-    return x / denom, y / denom
-# Generate NURBS curve (from DRAFT, adapted for general points)
-def generate_nurbs_curve(points, weights, p, knots, num_points=1000):
-    u_min, u_max = knots[p], knots[-p-1]
-    u_values = np.linspace(u_min, u_max, num_points, endpoint=False)
-    curve = [nurbs_curve_point(u, points, weights, p, knots) for u in u_values]
-    curve.append(curve[0]) # Append first point for exact closure
-    return np.array(curve)
-# Custom interoperations for greencurve using NURBS with local kappa adjustment for closure
+# Custom interoperations for greencurve (custom kappa NURBS with endpoint kappa and theta decay, upgraded to degree 5 for G4 approx G5)
 def custom_interoperations_green_curve(points, kappas, is_closed=False):
     """
-    Custom NURBS curve with endpoint kappa and theta decay, using DRAFT NURBS for ellipse-like conditions on closure.
+    Custom kappa NURBS-like curve through points with endpoint kappa and theta decay for curvature continuity.
+    Args:
+        points (list): List of (x, y) points (kappa nodes).
+        kappas (list): Kappa values at each node.
+    Returns:
+        tuple: (x, y) arrays for the interoperated curve.
     """
     if len(points) < 2:
         return np.array([]), np.array([])
-    
-    # For closure, adjust weights for local kappa without affecting ends
     if is_closed:
-        # Example adjustment: increase weight at a segment for local curvature change
-        kappas[1] = 1.5 * kappas[1]  # Adjust second weight, like in DRAFT
-    
-    # Use degree 2 for conics-like (ellipse conditions)
-    p = 2
-    # Generate knots: open for general, with multiples for closure if closed
-    n = len(points) - 1
-    if is_closed:
-        # For closed, use uniform knots with repeats for continuity
-        knots = np.linspace(0, 1, len(points) + p + 1)
-        knots = np.concatenate(([0] * p, knots, [1] * p))
-    else:
-        knots = np.linspace(0, 1, len(points) + p + 1)
-    
-    # Add theta decay: modulate weights by decay
-    t = np.cumsum([0] + [np.sqrt((points[i+1][0] - points[i][0])**2 + (points[i+1][1] - points[i][1])**2) for i in range(n)])
-    decay_factors = np.exp(-t / t[-1] / 20.0) if t[-1] > 0 else np.ones(len(points))
-    effective_weights = [kappas[i] * decay_factors[i] for i in range(len(points))]
-    
-    # Generate curve
-    curve = generate_nurbs_curve(points, effective_weights, p, knots)
-    x, y = curve[:, 0], curve[:, 1]
-    
-    # Inter-sum operations: after computing y, adjust x based on y (as per request)
-    x += 0.05 * y  # Example inter-sum: x changed based on y for coupled modulation
-    
-    return x, y
-
+        # For closed curve, append first degree points to end for periodic continuity
+        degree = 5
+        points = points + points[1:degree+1]
+        kappas = kappas + kappas[1:degree+1]
+    x_points = [p[0] for p in points]
+    y_points = [p[1] for p in points]
+    t = np.cumsum([0] + [np.sqrt((x_points[i+1] - x_points[i])**2 + (y_points[i+1] - y_points[i])**2) for i in range(len(points)-1)])
+    t_fine = np.linspace(0, t[-1], 1000) if t[-1] > 0 else np.linspace(0, 1, 1000)
+    # Upgrade to degree 5 for higher continuity (G4, approximating G5)
+    degree = 5
+    # Custom NURBS basis functions (recursive for higher degree)
+    def nurbs_basis(u, i, p, knots):
+        if p == 0:
+            return 1.0 if knots[i] <= u < knots[i+1] else 0.0
+        if knots[i+p] == knots[i]:
+            c1 = 0.0
+        else:
+            c1 = (u - knots[i]) / (knots[i+p] - knots[i]) * nurbs_basis(u, i, p-1, knots)
+        if knots[i+p+1] == knots[i+1]:
+            c2 = 0.0
+        else:
+            c2 = (knots[i+p+1] - u) / (knots[i+p+1] - knots[i+1]) * nurbs_basis(u, i+1, p-1, knots)
+        return c1 + c2
+    # Generate knots based on theta (distance), non-uniform for decay, adjusted for higher degree
+    knots = [0] * (degree + 1) + list(np.cumsum([kappas[i] for i in range(len(points))])) + [t[-1]] * (degree + 1) # Clamped knots for endpoint interpolation
+    x_fine = []
+    y_fine = []
+    for u in t_fine:
+        x_val = 0.0
+        y_val = 0.0
+        n = len(points) - 1
+        for i in range(n + 1):
+            b = nurbs_basis(u, i, degree, knots) # Higher degree basis
+            weight = kappas[i] if i < len(kappas) else kappas[-1] # Weight by kappa
+            x_val += b * x_points[i] * weight
+            y_val += b * y_points[i] * weight
+        # Theta decay adjustment
+        decay = np.exp(-u / t[-1] / 20.0) if t[-1] > 0 else 1.0
+        x_val *= decay
+        y_val *= decay
+        x_fine.append(x_val)
+        y_fine.append(y_val)
+    return np.array(x_fine), np.array(y_fine)
 # Compute kappa for a segment, second endpoint influences next kappa
 def compute_segment_kappa(p1, p2, base_kappa=1.0, prev_kappa=1.0):
     """
@@ -213,6 +198,15 @@ ax_3d = fig_3d.add_subplot(111, projection='3d')
 fig_controls = plt.figure(figsize=(4, 6))
 ax_curvature = fig_controls.add_axes([0.2, 0.8, 0.6, 0.03])
 curvature_slider = Slider(ax_curvature, 'Curvature (kappa)', 0.1, 2.0, valinit=curvature)
+ax_height = fig_controls.add_axes([0.2, 0.7, 0.6, 0.03])
+height_slider = Slider(ax_height, 'Height', 0.1, 2.0, valinit=height)
+# Update height
+def update_height(val):
+    global height
+    height = val
+    if is_closed:
+        update_3d_model()
+height_slider.on_changed(update_height)
 # Plot A3 page
 ax_2d.plot([0, WIDTH, WIDTH, 0, 0], [0, 0, HEIGHT, HEIGHT, 0], 'k-', label='A3 Landscape Page')
 for x in PURPLE_LINES:
@@ -354,13 +348,11 @@ def on_click_dimension(event):
 def generate_gcode(x, y, speeds, scale=297):
     """
     Generates simple G-code for linear moves along the curve with variable feedrates.
-  
     Args:
         x (array): X coordinates (normalized).
         y (array): Y coordinates (normalized).
         speeds (list): Normalized speeds (0-1) for each point.
         scale (float): Scale factor to convert normalized units to mm (based on A3 height=297mm).
-  
     Returns:
         str: G-code string.
     """
@@ -390,7 +382,9 @@ def on_click_draw(event):
                     decay_factor = np.exp(-last_theta / WIDTH / 20.0)
                     kappas[0] = kappas[-1] * decay_factor * curvature # Affect kappa1 with last kappa and decay
                     drawing_points.append(drawing_points[0])
-                    kappas.append(curvature)
+                    kappas.append(kappas[0]) # Last kappa inherits first kappa's theta (via same value)
+                    recalculate_kappas() # Recalculate curvature operations after merging
+                    is_closed = True
                     redraw_green_curve(is_closed=True) # Use closed NURBS for ellipse conditions
                     # Get closed curve
                     x_curve, y_curve = green_curve_line.get_data()
@@ -427,6 +421,7 @@ def on_click_draw(event):
             color = roygbiv[len(drawing_points) % 7]
             node = ax_2d.scatter(x, y, color=color, s=50, picker=True, label='Kappa Node' if len(drawing_points) == 0 else None)
             node_scatter.append(node)
+            original_colors.append(color)
             drawing_points.append((x, y))
             kappas.append(curvature)
             if len(drawing_points) > 1:
@@ -502,7 +497,7 @@ def auto_close(event):
         kappas.append(curvature)
         is_closed = True
         redraw_green_curve(is_closed=True) # Use closed NURBS for ellipse conditions
-        node_scatter[0].set_color('red')  # Keep closed node 1/last red
+        node_scatter[0].set_color('red') # Keep closed node 1/last red
         # Get closed curve
         x_curve, y_curve = green_curve_line.get_data()
         if np.hypot(x_curve[-1] - x_curve[0], y_curve[-1] - y_curve[0]) > 1e-5:
@@ -565,7 +560,7 @@ def hide_show(event):
         fig_2d.canvas.draw()
 # Reset canvas
 def reset_canvas(event):
-    global drawing_points, kappas, previous_kappa, green_curve_line, vanishing_points, selected_curve, current_vertices, current_faces, last_angle, node_scatter, ghost_handles, is_closed
+    global drawing_points, kappas, previous_kappa, green_curve_line, vanishing_points, selected_curve, current_vertices, current_faces, last_angle, node_scatter, ghost_handles, is_closed, original_colors
     if event.key == 'e':
         drawing_points = []
         kappas = []
@@ -576,6 +571,7 @@ def reset_canvas(event):
         for node in node_scatter:
             node.remove()
         node_scatter = []
+        original_colors = []
         for handle in ghost_handles:
             handle.remove()
         ghost_handles = []
@@ -603,10 +599,10 @@ def compute_curvature(x, y, t):
 # Generate base pod curve (closed for boundary surface, now 3D curve)
 def generate_pod_curve_closed(num_points=100):
     t = np.linspace(0, 2 * np.pi, num_points) # Full closed loop
-    r = 0.5 + 0.2 * np.cos(6 * t)  # Flower-like top profile
+    r = 0.5 + 0.2 * np.cos(6 * t) # Flower-like top profile
     x = r * np.cos(t)
     y = r * np.sin(t)
-    z = 0.1 * np.sin(6 * t)  # Add z variation for 3D curve
+    z = 0.1 * np.sin(6 * t) # Add z variation for 3D curve
     return x, y, z
 # Build mesh for 3D model (reconsidered: two surfaces with vertical edge relation at curve, inheriting curvature across)
 def build_mesh(x_curve, y_curve, z_curve=None, height=0.5, num_rings=20, num_points=None):
@@ -621,17 +617,17 @@ def build_mesh(x_curve, y_curve, z_curve=None, height=0.5, num_rings=20, num_poi
             z_curve = z_curve[indices]
     n = len(x_curve)
     if z_curve is None:
-        z_curve = np.zeros(n)  # Default to flat if no z provided
+        z_curve = np.zeros(n) # Default to flat if no z provided
     center_x = drawing_points[0][0] if drawing_points else np.mean(x_curve) # Datum at kappa node 1 if available
     center_y = drawing_points[0][1] if drawing_points else np.mean(y_curve)
     vertices = []
     faces = []
-   
+ 
     # Parting line on 3D curve
     parting_base = len(vertices)
     for i in range(n):
         vertices.append([x_curve[i], y_curve[i], z_curve[i]])
-   
+ 
     # Upper surface: rings inward with vertical tangent at edge
     upper_bases = [parting_base]
     for l in range(1, num_rings):
@@ -649,7 +645,7 @@ def build_mesh(x_curve, y_curve, z_curve=None, height=0.5, num_rings=20, num_poi
             vertices.append([x, y, z])
     center_upper = len(vertices)
     vertices.append([center_x, center_y, height / 2])
-   
+ 
     # Lower surface: mirrored rings with same profile (inherits upper's curvature)
     lower_bases = [parting_base] # Shared edge
     for l in range(1, num_rings):
@@ -667,7 +663,7 @@ def build_mesh(x_curve, y_curve, z_curve=None, height=0.5, num_rings=20, num_poi
             vertices.append([x, y, z])
     center_lower = len(vertices)
     vertices.append([center_x, center_y, -height / 2])
-   
+ 
     # Faces for upper surface
     for ll in range(len(upper_bases) - 1):
         base = upper_bases[ll]
@@ -681,7 +677,7 @@ def build_mesh(x_curve, y_curve, z_curve=None, height=0.5, num_rings=20, num_poi
     for i in range(n):
         next_i = (i + 1) % n
         faces.append([center_upper, base + next_i, base + i])
-   
+ 
     # Faces for lower surface
     for ll in range(len(lower_bases) - 1):
         base = lower_bases[ll]
@@ -695,10 +691,10 @@ def build_mesh(x_curve, y_curve, z_curve=None, height=0.5, num_rings=20, num_poi
     for i in range(n):
         next_i = (i + 1) % n
         faces.append([center_lower, base + i, base + next_i])
-   
+ 
     # Convert to numpy array
     vertices = np.array(vertices)
-   
+ 
     # Add compound curvature modulation with angle and 3D kappa grid for smooth orthographic projections
     grid_size, _, num_angles = kappa_grid.shape
     angle_idx = int((last_angle / 360) * num_angles) % num_angles
@@ -711,7 +707,7 @@ def build_mesh(x_curve, y_curve, z_curve=None, height=0.5, num_rings=20, num_poi
     vertices[:, 2] += kappa_mod * 0.1 # Scale z modulation
     vertices[:, 0] += kappa_mod * 0.05 * np.sin(2 * np.pi * vertices[:, 2] / height) # Compound in x
     vertices[:, 1] += kappa_mod * 0.05 * np.cos(2 * np.pi * vertices[:, 2] / height) # Compound in y
-   
+ 
     return vertices, faces
 # Function to compute normals
 def compute_normal(v1, v2, v3):
@@ -752,7 +748,7 @@ def save_stl(event):
 # Display pod surface by default in 3D with curvature continuous end caps
 def display_pod_surface():
     global current_vertices, current_faces
-    x_curve, y_curve, z_curve = generate_pod_curve_closed(50)  # 3D curve
+    x_curve, y_curve, z_curve = generate_pod_curve_closed(50) # 3D curve
     current_vertices, current_faces = build_mesh(x_curve, y_curve, z_curve)
     verts = [[current_vertices[i] for i in f] for f in current_faces]
     ax_3d.add_collection3d(Poly3DCollection(verts, alpha=0.5, facecolors=cm.viridis(np.linspace(0, 1, len(verts)))))
@@ -763,7 +759,7 @@ def display_pod_surface():
     fig_3d.canvas.draw()
 # Draw default pod ellipse as green curve on 2D canvas
 def draw_default_pod(ax, color='g'):
-    x, y, _ = generate_pod_curve_closed(num_points=9)  # Project to 2D
+    x, y, _ = generate_pod_curve_closed(num_points=9) # Project to 2D
     x_control = x[:-1]
     y_control = y[:-1]
     scale = 0.6 # Scale for large curve
@@ -793,11 +789,10 @@ def on_pick(event):
     artist = event.artist
     if artist in node_scatter:
         selected_node_index = node_scatter.index(artist)
-        artist.set_color('yellow')  # Highlight selected node
+        artist.set_color('yellow') # Highlight selected node
         if pro_mode:
             show_ghost_handles()
         fig_2d.canvas.draw()
-
 # Show ghost handles (theta points, midpoints between nodes)
 def show_ghost_handles():
     global ghost_handles
@@ -810,18 +805,15 @@ def show_ghost_handles():
         handle = ax_2d.scatter(mid_x, mid_y, color='yellow', s=30, marker='o')
         ghost_handles.append(handle)
     fig_2d.canvas.draw()
-
 # On button press for dragging
 def on_button_press(event):
     global dragging
     if pro_mode and selected_node_index != -1 and event.inaxes == ax_2d and event.button == 1:
         dragging = True
-
 # On button release for dragging
 def on_button_release(event):
     global dragging
     dragging = False
-
 # Connect events
 fig_2d.canvas.mpl_connect('key_press_event', toggle_draw)
 fig_2d.canvas.mpl_connect('key_press_event', toggle_protractor)
