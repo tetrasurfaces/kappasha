@@ -51,6 +51,7 @@ protractor_active = False
 ruler_active = False
 draw_mode = False
 dimension_active = False
+pro_mode = False
 selected_curve = None
 hidden_elements = []
 protractor_points = []
@@ -62,6 +63,10 @@ ruler_text = None
 dimension_labels = []
 drawing_points = [] # Kappa nodes (first endpoint of each greenchord)
 kappas = [] # Kappa values at each node
+node_scatter = [] # List of scatter objects for kappa nodes
+selected_node_index = -1
+dragging = False
+ghost_handles = [] # List for theta ghost handles
 green_curve_line = None # Single plot object for the interoperated greencurve
 CLOSE_THRESHOLD = 0.05 # Distance to first point to consider closing
 vanishing_points = [] # Vanishing points for each triangulation
@@ -416,8 +421,10 @@ def on_click_draw(event):
                     fig_2d.canvas.draw()
                     return
             # Add new kappa node (first endpoint)
+            color = 'blue' if len(drawing_points) == 0 else 'red'
+            node = ax_2d.scatter(x, y, color=color, s=50, picker=True, label='Kappa Node' if len(drawing_points) == 0 else None)
+            node_scatter.append(node)
             drawing_points.append((x, y))
-            ax_2d.scatter(x, y, color='r', s=50, label='Kappa Node' if len(drawing_points) == 1 else None)
             kappas.append(curvature)
             if len(drawing_points) > 1:
                 previous_kappa = compute_segment_kappa(drawing_points[-2], drawing_points[-1], curvature, previous_kappa)
@@ -449,7 +456,13 @@ def on_click_draw(event):
                 fig_2d.canvas.draw()
 # Ghost curve preview on motion (cursor at theta)
 def on_motion(event):
-    global previous_kappa
+    global previous_kappa, dragging, selected_node_index
+    if dragging and pro_mode and selected_node_index != -1 and event.inaxes == ax_2d:
+        drawing_points[selected_node_index] = (event.xdata, event.ydata)
+        node_scatter[selected_node_index].set_offsets([event.xdata, event.ydata])
+        redraw_green_curve()
+        fig_2d.canvas.draw()
+        return
     if draw_mode and len(drawing_points) > 0 and event.inaxes == ax_2d and not (protractor_active or ruler_active or dimension_active):
         x, y = event.xdata, event.ydata
         preview_points = drawing_points + [(x, y)]
@@ -509,7 +522,7 @@ def hide_show(event):
         fig_2d.canvas.draw()
 # Reset canvas
 def reset_canvas(event):
-    global drawing_points, kappas, previous_kappa, green_curve_line, vanishing_points, selected_curve, current_vertices, current_faces, last_angle
+    global drawing_points, kappas, previous_kappa, green_curve_line, vanishing_points, selected_curve, current_vertices, current_faces, last_angle, node_scatter, ghost_handles
     if event.key == 'e':
         drawing_points = []
         kappas = []
@@ -517,6 +530,12 @@ def reset_canvas(event):
         if green_curve_line:
             green_curve_line.remove()
             green_curve_line = None
+        for node in node_scatter:
+            node.remove()
+        node_scatter = []
+        for handle in ghost_handles:
+            handle.remove()
+        ghost_handles = []
         vanishing_points = []
         selected_curve = None
         ax_3d.cla()
@@ -537,43 +556,41 @@ def compute_curvature(x, y, t):
     denominator = (dx_dt**2 + dy_dt**2)**1.5
     denominator = np.where(denominator == 0, 1e-10, denominator)
     return numerator / denominator
-# Generate base iPod curve (closed for boundary surface)
+# Generate base iPod curve (closed for boundary surface, now 3D curve)
 def generate_ipod_curve_closed(num_points=100):
     t = np.linspace(0, 2 * np.pi, num_points) # Full closed loop
-    r_x = 1.0 # Width
-    r_y = 1.5 # Height (taller than wide)
-    x = r_x * np.cos(t)
-    y = r_y * np.sin(t)
-    # Add rounding for iPod-like bezel (simple modulation)
-    x += 0.1 * np.sin(4 * t)
-    y += 0.1 * np.cos(4 * t)
-    return x, y
+    r = 0.5 + 0.2 * np.cos(6 * t)  # Flower-like top profile
+    x = r * np.cos(t)
+    y = r * np.sin(t)
+    z = 0.1 * np.sin(6 * t)  # Add z variation for 3D curve
+    return x, y, z
 # Build mesh for 3D model (reconsidered: two surfaces with vertical edge relation at curve, inheriting curvature across)
-def build_mesh(x_curve, y_curve, height=0.5, num_rings=20, num_points=None):
+def build_mesh(x_curve, y_curve, z_curve, height=0.5, num_rings=20, num_points=None):
     """
-    Builds two surfaces meeting at the curve with vertical tangent, inheriting each other's curvature in transition.
+    Builds two surfaces meeting at the 3D curve with vertical tangent, inheriting each other's curvature in transition.
     """
     if num_points is not None:
         indices = np.linspace(0, len(x_curve) - 1, num_points, dtype=int)
         x_curve = x_curve[indices]
         y_curve = y_curve[indices]
+        z_curve = z_curve[indices]
     n = len(x_curve)
-    center_x = np.mean(x_curve)
-    center_y = np.mean(y_curve)
+    center_x = drawing_points[0][0] if drawing_points else np.mean(x_curve) # Datum at kappa node 1 if available
+    center_y = drawing_points[0][1] if drawing_points else np.mean(y_curve)
     vertices = []
     faces = []
    
-    # Parting line at z=0
+    # Parting line on 3D curve
     parting_base = len(vertices)
     for i in range(n):
-        vertices.append([x_curve[i], y_curve[i], 0.0])
+        vertices.append([x_curve[i], y_curve[i], z_curve[i]])
    
-    # Upper surface: rings inward with vertical tangent at edge (scale=1-s^2, g= (height/2) * (2s - s^2))
+    # Upper surface: rings inward with vertical tangent at edge
     upper_bases = [parting_base]
     for l in range(1, num_rings):
         s = l / (num_rings - 1.0)
-        scale = 1 - s**2  # Vertical tangent at s=0 (dr/ds=0)
-        g_val = (height / 2) * (2 * s - s**2)  # Inherited curvature (parabola, matching lower)
+        scale = 1 - s**2 # Vertical tangent at s=0 (dr/ds=0)
+        g_val = (height / 2) * (2 * s - s**2) # Inherited curvature (parabola, matching lower)
         base = len(vertices)
         upper_bases.append(base)
         for i in range(n):
@@ -581,17 +598,17 @@ def build_mesh(x_curve, y_curve, height=0.5, num_rings=20, num_points=None):
             vec_y = y_curve[i] - center_y
             x = center_x + scale * vec_x
             y = center_y + scale * vec_y
-            z = g_val
+            z = z_curve[i] * (1 - s) + g_val # Propagate 3D curve z, decaying inward
             vertices.append([x, y, z])
     center_upper = len(vertices)
     vertices.append([center_x, center_y, height / 2])
    
     # Lower surface: mirrored rings with same profile (inherits upper's curvature)
-    lower_bases = [parting_base]  # Shared edge
+    lower_bases = [parting_base] # Shared edge
     for l in range(1, num_rings):
         s = l / (num_rings - 1.0)
         scale = 1 - s**2
-        g_val = (height / 2) * (2 * s - s**2)  # Same as upper for inherited constant curvature
+        g_val = (height / 2) * (2 * s - s**2) # Same as upper for inherited constant curvature
         base = len(vertices)
         lower_bases.append(base)
         for i in range(n):
@@ -599,7 +616,7 @@ def build_mesh(x_curve, y_curve, height=0.5, num_rings=20, num_points=None):
             vec_y = y_curve[i] - center_y
             x = center_x + scale * vec_x
             y = center_y + scale * vec_y
-            z = -g_val  # Mirrored
+            z = z_curve[i] * (1 - s) - g_val # Mirrored and propagate z
             vertices.append([x, y, z])
     center_lower = len(vertices)
     vertices.append([center_x, center_y, -height / 2])
@@ -688,8 +705,8 @@ def save_stl(event):
 # Display iPod surface by default in 3D with curvature continuous end caps
 def display_ipod_surface():
     global current_vertices, current_faces
-    x_curve, y_curve = generate_ipod_curve_closed(50)
-    current_vertices, current_faces = build_mesh(x_curve, y_curve)
+    x_curve, y_curve, z_curve = generate_ipod_curve_closed(50)  # 3D curve
+    current_vertices, current_faces = build_mesh(x_curve, y_curve, z_curve)
     verts = [[current_vertices[i] for i in f] for f in current_faces]
     ax_3d.add_collection3d(Poly3DCollection(verts, alpha=0.5, facecolors=cm.viridis(np.linspace(0, 1, len(verts)))))
     ax_3d.set_xlabel('X')
@@ -699,7 +716,7 @@ def display_ipod_surface():
     fig_3d.canvas.draw()
 # Draw default iPod ellipse as green curve on 2D canvas
 def draw_default_ipod(ax, color='g'):
-    x, y = generate_ipod_curve_closed(num_points=9)
+    x, y, _ = generate_ipod_curve_closed(num_points=9)  # Project to 2D
     x_control = x[:-1]
     y_control = y[:-1]
     scale = 0.6 # Scale for large curve
@@ -716,6 +733,48 @@ def draw_default_ipod(ax, color='g'):
     for i in range(len(x_interp)):
         speed = int(hashlib.sha256(f"{x_interp[i]}{y_interp[i]}".encode()).hexdigest()[-4:], 16) % 1000 / 1000.0
         print(f"Point {i}: ({x_interp[i]:.4f}, {y_interp[i]:.4f}), Speed: {speed:.4f}")
+# Toggle pro mode
+def toggle_pro_mode(event):
+    global pro_mode
+    if event.key == 'o':
+        pro_mode = not pro_mode
+        print(f"Pro mode {'enabled' if pro_mode else 'disabled'}")
+        fig_2d.canvas.draw()
+# On pick event for nodes
+def on_pick(event):
+    global selected_node_index
+    artist = event.artist
+    if artist in node_scatter:
+        selected_node_index = node_scatter.index(artist)
+        artist.set_color('yellow')  # Highlight selected node
+        if pro_mode:
+            show_ghost_handles()
+        fig_2d.canvas.draw()
+
+# Show ghost handles (theta points, midpoints between nodes)
+def show_ghost_handles():
+    global ghost_handles
+    for handle in ghost_handles:
+        handle.remove()
+    ghost_handles = []
+    for i in range(len(drawing_points) - 1):
+        mid_x = (drawing_points[i][0] + drawing_points[i+1][0]) / 2
+        mid_y = (drawing_points[i][1] + drawing_points[i+1][1]) / 2
+        handle = ax_2d.scatter(mid_x, mid_y, color='yellow', s=30, marker='o')
+        ghost_handles.append(handle)
+    fig_2d.canvas.draw()
+
+# On button press for dragging
+def on_button_press(event):
+    global dragging
+    if pro_mode and selected_node_index != -1 and event.inaxes == ax_2d and event.button == 1:
+        dragging = True
+
+# On button release for dragging
+def on_button_release(event):
+    global dragging
+    dragging = False
+
 # Connect events
 fig_2d.canvas.mpl_connect('key_press_event', toggle_draw)
 fig_2d.canvas.mpl_connect('key_press_event', toggle_protractor)
@@ -731,6 +790,10 @@ fig_2d.canvas.mpl_connect('button_press_event', on_click_dimension)
 fig_2d.canvas.mpl_connect('button_press_event', on_click_draw)
 fig_2d.canvas.mpl_connect('motion_notify_event', on_motion)
 fig_2d.canvas.mpl_connect('key_press_event', close_polyhedron)
+fig_2d.canvas.mpl_connect('key_press_event', toggle_pro_mode)
+fig_2d.canvas.mpl_connect('pick_event', on_pick)
+fig_2d.canvas.mpl_connect('button_press_event', on_button_press)
+fig_2d.canvas.mpl_connect('button_release_event', on_button_release)
 # Plot properties
 ax_2d.set_xlim(0, WIDTH)
 ax_2d.set_ylim(0, HEIGHT)
