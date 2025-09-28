@@ -52,6 +52,7 @@ ruler_active = False
 draw_mode = False
 dimension_active = False
 pro_mode = False
+is_closed = False
 selected_curve = None
 hidden_elements = []
 protractor_points = []
@@ -238,6 +239,7 @@ ax_2d.plot([], [], ' ', label='G: To construction geom')
 ax_2d.plot([], [], ' ', label='H: Hide/show')
 ax_2d.plot([], [], ' ', label='E: Reset canvas')
 ax_2d.plot([], [], ' ', label='S: Export STL')
+ax_2d.plot([], [], ' ', label='X Lock/Unlock pro mode')
 ax_2d.plot([], [], 'k-', label='Curvature Slider (Controls window)')
 # Update curvature
 def update_curvature(val):
@@ -421,7 +423,8 @@ def on_click_draw(event):
                     fig_2d.canvas.draw()
                     return
             # Add new kappa node (first endpoint)
-            color = 'blue' if len(drawing_points) == 0 else 'red'
+            roygbiv = ['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'violet']
+            color = roygbiv[len(drawing_points) % 7]
             node = ax_2d.scatter(x, y, color=color, s=50, picker=True, label='Kappa Node' if len(drawing_points) == 0 else None)
             node_scatter.append(node)
             drawing_points.append((x, y))
@@ -460,7 +463,9 @@ def on_motion(event):
     if dragging and pro_mode and selected_node_index != -1 and event.inaxes == ax_2d:
         drawing_points[selected_node_index] = (event.xdata, event.ydata)
         node_scatter[selected_node_index].set_offsets([event.xdata, event.ydata])
-        redraw_green_curve()
+        redraw_green_curve(is_closed=is_closed)
+        if is_closed:
+            update_3d_model()
         fig_2d.canvas.draw()
         return
     if draw_mode and len(drawing_points) > 0 and event.inaxes == ax_2d and not (protractor_active or ruler_active or dimension_active):
@@ -485,10 +490,48 @@ def on_motion(event):
         x_ghost, y_ghost = custom_interoperations_green_curve(preview_points, preview_kappas)
         ghost_curve.set_data(x_ghost, y_ghost)
         fig_2d.canvas.draw()
-# Close polyhedron (manual trigger)
-def close_polyhedron(event):
-    if event.key == 'c':
-        print("Close via clicking near first point when ghosted")
+# Auto close on 'c'
+def auto_close(event):
+    global is_closed, drawing_points, kappas, previous_kappa
+    if event.key == 'c' and len(drawing_points) > 2:
+        # Adjust kappa1 based on last theta and kappa
+        last_theta = np.sqrt((drawing_points[-1][0] - drawing_points[0][0])**2 + (drawing_points[-1][1] - drawing_points[0][1])**2)
+        decay_factor = np.exp(-last_theta / WIDTH / 20.0)
+        kappas[0] = kappas[-1] * decay_factor * curvature # Affect kappa1 with last kappa and decay
+        drawing_points.append(drawing_points[0])
+        kappas.append(curvature)
+        is_closed = True
+        redraw_green_curve(is_closed=True) # Use closed NURBS for ellipse conditions
+        node_scatter[0].set_color('red')  # Keep closed node 1/last red
+        # Get closed curve
+        x_curve, y_curve = green_curve_line.get_data()
+        if np.hypot(x_curve[-1] - x_curve[0], y_curve[-1] - y_curve[0]) > 1e-5:
+            x_curve = np.append(x_curve, x_curve[0])
+            y_curve = np.append(y_curve, y_curve[0])
+        ax_3d.cla()
+        current_vertices, current_faces = build_mesh(x_curve, y_curve, np.zeros(len(x_curve)))
+        verts = [[current_vertices[i] for i in f] for f in current_faces]
+        ax_3d.add_collection3d(Poly3DCollection(verts, alpha=0.5, facecolors=cm.viridis(np.linspace(0, 1, len(verts)))))
+        ax_3d.set_xlabel('X')
+        ax_3d.set_ylabel('Y')
+        ax_3d.set_zlabel('Z')
+        ax_3d.set_title('3D User Model (Compound Curvature with End Caps)')
+        fig_3d.canvas.draw()
+        print("Polyhedron closed and 3D model generated")
+        # Compute and print speeds for user generated curve
+        print("User Generated Curve Speeds:")
+        speeds = []
+        for i in range(len(x_curve)):
+            speed = int(hashlib.sha256(f"{x_curve[i]}{y_curve[i]}".encode()).hexdigest()[-4:], 16) % 1000 / 1000.0
+            print(f"Point {i}: ({x_curve[i]:.4f}, {y_curve[i]:.4f}), Speed: {speed:.4f}")
+            speeds.append(speed)
+        # Generate G-Code
+        gcode = generate_gcode(x_curve, y_curve, speeds)
+        with open('model.gcode', 'w') as f:
+            f.write(gcode)
+        print("G-Code saved to model.gcode")
+        print(gcode)
+        fig_2d.canvas.draw()
 # Change to construction geometry
 def to_construction(event):
     global selected_curve
@@ -522,7 +565,7 @@ def hide_show(event):
         fig_2d.canvas.draw()
 # Reset canvas
 def reset_canvas(event):
-    global drawing_points, kappas, previous_kappa, green_curve_line, vanishing_points, selected_curve, current_vertices, current_faces, last_angle, node_scatter, ghost_handles
+    global drawing_points, kappas, previous_kappa, green_curve_line, vanishing_points, selected_curve, current_vertices, current_faces, last_angle, node_scatter, ghost_handles, is_closed
     if event.key == 'e':
         drawing_points = []
         kappas = []
@@ -542,7 +585,8 @@ def reset_canvas(event):
         current_vertices = None
         current_faces = None
         last_angle = 0.0
-        display_ipod_surface()
+        is_closed = False
+        display_pod_surface()
         print("Canvas reset")
         fig_2d.canvas.draw()
 # Compute curvature for continuity check
@@ -556,8 +600,8 @@ def compute_curvature(x, y, t):
     denominator = (dx_dt**2 + dy_dt**2)**1.5
     denominator = np.where(denominator == 0, 1e-10, denominator)
     return numerator / denominator
-# Generate base iPod curve (closed for boundary surface, now 3D curve)
-def generate_ipod_curve_closed(num_points=100):
+# Generate base pod curve (closed for boundary surface, now 3D curve)
+def generate_pod_curve_closed(num_points=100):
     t = np.linspace(0, 2 * np.pi, num_points) # Full closed loop
     r = 0.5 + 0.2 * np.cos(6 * t)  # Flower-like top profile
     x = r * np.cos(t)
@@ -705,21 +749,21 @@ def export_stl():
 def save_stl(event):
     if event.key == 's':
         export_stl()
-# Display iPod surface by default in 3D with curvature continuous end caps
-def display_ipod_surface():
+# Display pod surface by default in 3D with curvature continuous end caps
+def display_pod_surface():
     global current_vertices, current_faces
-    x_curve, y_curve, z_curve = generate_ipod_curve_closed(50)  # 3D curve
+    x_curve, y_curve, z_curve = generate_pod_curve_closed(50)  # 3D curve
     current_vertices, current_faces = build_mesh(x_curve, y_curve, z_curve)
     verts = [[current_vertices[i] for i in f] for f in current_faces]
     ax_3d.add_collection3d(Poly3DCollection(verts, alpha=0.5, facecolors=cm.viridis(np.linspace(0, 1, len(verts)))))
     ax_3d.set_xlabel('X')
     ax_3d.set_ylabel('Y')
     ax_3d.set_zlabel('Z')
-    ax_3d.set_title('3D iPod Projected Surface (Compound Curvature with End Caps)')
+    ax_3d.set_title('3D pod Projected Surface (Compound Curvature with End Caps)')
     fig_3d.canvas.draw()
-# Draw default iPod ellipse as green curve on 2D canvas
-def draw_default_ipod(ax, color='g'):
-    x, y, _ = generate_ipod_curve_closed(num_points=9)  # Project to 2D
+# Draw default pod ellipse as green curve on 2D canvas
+def draw_default_pod(ax, color='g'):
+    x, y, _ = generate_pod_curve_closed(num_points=9)  # Project to 2D
     x_control = x[:-1]
     y_control = y[:-1]
     scale = 0.6 # Scale for large curve
@@ -728,20 +772,20 @@ def draw_default_ipod(ax, color='g'):
     x_control += WIDTH / 2
     y_control += HEIGHT / 2
     points = list(zip(x_control, y_control))
-    kappas_ipod = [1.0] * len(points)
-    x_interp, y_interp = custom_interoperations_green_curve(points, kappas_ipod)
+    kappas_pod = [1.0] * len(points)
+    x_interp, y_interp = custom_interoperations_green_curve(points, kappas_pod)
     ax.plot(x_interp, y_interp, color=color, linewidth=3, linestyle='-')
     # Compute and print speeds for default curve
     print("Default Curve Speeds:")
     for i in range(len(x_interp)):
         speed = int(hashlib.sha256(f"{x_interp[i]}{y_interp[i]}".encode()).hexdigest()[-4:], 16) % 1000 / 1000.0
         print(f"Point {i}: ({x_interp[i]:.4f}, {y_interp[i]:.4f}), Speed: {speed:.4f}")
-# Toggle pro mode
+# Toggle pro mode (lock/unlock)
 def toggle_pro_mode(event):
     global pro_mode
-    if event.key == 'o':
+    if event.key == 'x':
         pro_mode = not pro_mode
-        print(f"Pro mode {'enabled' if pro_mode else 'disabled'}")
+        print(f"Pro mode {'locked' if pro_mode else 'unlocked'}")
         fig_2d.canvas.draw()
 # On pick event for nodes
 def on_pick(event):
@@ -792,7 +836,7 @@ fig_2d.canvas.mpl_connect('button_press_event', on_click_ruler)
 fig_2d.canvas.mpl_connect('button_press_event', on_click_dimension)
 fig_2d.canvas.mpl_connect('button_press_event', on_click_draw)
 fig_2d.canvas.mpl_connect('motion_notify_event', on_motion)
-fig_2d.canvas.mpl_connect('key_press_event', close_polyhedron)
+fig_2d.canvas.mpl_connect('key_press_event', auto_close)
 fig_2d.canvas.mpl_connect('key_press_event', toggle_pro_mode)
 fig_2d.canvas.mpl_connect('pick_event', on_pick)
 fig_2d.canvas.mpl_connect('button_press_event', on_button_press)
@@ -804,6 +848,6 @@ ax_2d.set_aspect('equal')
 ax_2d.legend(loc='center left', bbox_to_anchor=(1.0, 0.5), fontsize='small')
 ax_2d.grid(True)
 ax_2d.set_title('2D Drawing Tool on A3 Landscape with Continuous Green Curve')
-display_ipod_surface() # Show iPod surface on load
-draw_default_ipod(ax_2d) # Draw default iPod ellipse on load with G5 interoperations
+display_pod_surface() # Show pod surface on load
+draw_default_pod(ax_2d) # Draw default pod ellipse on load with G5 interoperations
 plt.show()
