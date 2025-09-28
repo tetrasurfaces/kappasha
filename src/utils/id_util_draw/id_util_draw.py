@@ -239,7 +239,7 @@ ax_2d.plot([], [], ' ', label='G: To construction geom')
 ax_2d.plot([], [], ' ', label='H: Hide/show')
 ax_2d.plot([], [], ' ', label='E: Reset canvas')
 ax_2d.plot([], [], ' ', label='S: Export STL')
-ax_2d.plot([], [], ' ', label='X Lock/Unlock pro mode')
+ax_2d.plot([], [], ' ', label='X: Lock/Unlock pro mode')
 ax_2d.plot([], [], 'k-', label='Curvature Slider (Controls window)')
 # Update curvature
 def update_curvature(val):
