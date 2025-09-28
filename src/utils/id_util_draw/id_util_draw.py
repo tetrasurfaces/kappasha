@@ -396,7 +396,7 @@ def on_click_draw(event):
                         x_curve = np.append(x_curve, x_curve[0])
                         y_curve = np.append(y_curve, y_curve[0])
                     ax_3d.cla()
-                    current_vertices, current_faces = build_mesh(x_curve, y_curve, num_points=50)
+                    current_vertices, current_faces = build_mesh(x_curve, y_curve, np.zeros(len(x_curve)))
                     verts = [[current_vertices[i] for i in f] for f in current_faces]
                     ax_3d.add_collection3d(Poly3DCollection(verts, alpha=0.5, facecolors=cm.viridis(np.linspace(0, 1, len(verts)))))
                     ax_3d.set_xlabel('X')
@@ -565,7 +565,7 @@ def generate_ipod_curve_closed(num_points=100):
     z = 0.1 * np.sin(6 * t)  # Add z variation for 3D curve
     return x, y, z
 # Build mesh for 3D model (reconsidered: two surfaces with vertical edge relation at curve, inheriting curvature across)
-def build_mesh(x_curve, y_curve, z_curve, height=0.5, num_rings=20, num_points=None):
+def build_mesh(x_curve, y_curve, z_curve=None, height=0.5, num_rings=20, num_points=None):
     """
     Builds two surfaces meeting at the 3D curve with vertical tangent, inheriting each other's curvature in transition.
     """
@@ -573,8 +573,11 @@ def build_mesh(x_curve, y_curve, z_curve, height=0.5, num_rings=20, num_points=N
         indices = np.linspace(0, len(x_curve) - 1, num_points, dtype=int)
         x_curve = x_curve[indices]
         y_curve = y_curve[indices]
-        z_curve = z_curve[indices]
+        if z_curve is not None:
+            z_curve = z_curve[indices]
     n = len(x_curve)
+    if z_curve is None:
+        z_curve = np.zeros(n)  # Default to flat if no z provided
     center_x = drawing_points[0][0] if drawing_points else np.mean(x_curve) # Datum at kappa node 1 if available
     center_y = drawing_points[0][1] if drawing_points else np.mean(y_curve)
     vertices = []
