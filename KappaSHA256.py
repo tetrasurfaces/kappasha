@@ -90,7 +90,7 @@ def iota(state, round_idx):
         0x000000000000008a, 0x0000000000000088, 0x0000000080008009, 0x000000008000000a,
         0x000000008000808b, 0x8000000000000003, 0x8000000000008089, 0x8000000000008002,
         0x8000000000000080, 0x000000000000800a, 0x800000008000000a, 0x8000000080008081,
-        0x8000000000008080, 0x0000000080000001, 0x8000000080008008
+        0x8000000000008080, 0x0000000080000001, 0x8000000080008008, 0x8000000000008008
     ]
     state[0][0] ^= RC[round_idx]
     return state
@@ -132,6 +132,7 @@ def divide_by_180(hash_hex, key_quotient=None):
 
 # KappaSHA-256 Hash Function
 def kappasha256(message: bytes, key: bytes, prime_index=11):
+    # Comment: Computes kappa-modulated hash with Keccak sponge, returns hash_hex, flattened, quotient.
     state = [[0 for _ in range(GRID_DIM)] for _ in range(GRID_DIM)]
     key_int = int.from_bytes(key, 'big')
     key_lanes = [[(key_int >> (LANE_BITS * (x * GRID_DIM + y))) & ((1 << LANE_BITS) - 1) for y in range(GRID_DIM)] for x in range(GRID_DIM)]
@@ -149,7 +150,7 @@ def kappasha256(message: bytes, key: bytes, prime_index=11):
             state = iota(state, round_idx)
     hash_hex = squeeze(state)
     H = mpmath.mpf(int(hash_hex, 16))
-    quotient = H // mpmath.pi
+    quotient = mpmath.floor(H / mpmath.pi)
     flattened = divide_by_180(hash_hex)
     return hash_hex, flattened, quotient
 
