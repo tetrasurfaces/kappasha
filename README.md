@@ -1,112 +1,119 @@
-# Kappasha
-Kappasha is an interactive Python application for visualizing Mersenne prime curves, golden spirals, and 3D fractal surfaces with curvature modulation. It uses Matplotlib for 2D and 3D plotting, incorporating geometric constructions, harmonic frequency annotations, and user-defined curves. The project supports tools like protractors, rulers, and G-code generation for CNC applications, with a focus on computational geometry and curvature continuity.
-Features
+# README for Kappasha
 
-Mersenne Prime Curves: Plots 52 curves corresponding to known Mersenne prime exponents, scaled to an A3 landscape layout.
-Golden Spiral and Green Segment: Visualizes a golden spiral and a green segment scaled to fit between purple divider lines.
-Interactive Tools: Supports drawing, measuring (protractor/ruler), dimensioning, and toggling harmonic frequencies.
-3D Surface Generation: Creates 3D models with fractal flower end caps and curvature modulation using a kappa grid.
-G-code Export: Generates G-code for 2D curves with variable feed rates for CNC applications.
-STL Export: Exports 3D models as STL files for 3D printing.
-HTML Export: Saves interactive 2D plots as HTML using mpld3 (optional).
+## Overview
+Kappasha is a GitHub repository that serves as a fork of the hashlet project, blending surface mathematics with cryptographic elements. It focuses on modeling complex surfaces, such as tetrahedral meshes and fractal patterns, while incorporating hashing techniques for applications like porosity simulation in materials science and digital security. The project emerged from discussions on GitHub repos related to tetra surfaces, fractal tetra, and simulations for case hardening of steel, where "hashing" refers to both cryptographic hashing and phase transformation tracking in metallurgy.
+
+Kappasha is designed for developers and researchers interested in intersecting computational geometry, crypto tools, and physical simulations. It includes Python scripts for generating fractal patterns, modeling porosity in steel hardening, and integrating gyroscopic and friction models for real-world applications like welding and infrastructure.
+
+## Features
+- **Surface Modeling**: Tools for tetrahedral meshing and fractal generation, inspired by repos like fractal_tetra.
+- **Porosity Simulation**: Models void growth during martensitic transformations in case hardening, with up to 30% porosity tracking.
+- **Hashing Integration**: Combines cryptographic hashing (e.g., for secure data) with "phase hashing" for tracking material transformations.
+- **Welding and Environmental Simulations**: Scripts for modeling welding sequences, preheating, cooling, and environmental factors like wind, smoke, and light reflections.
+- **Modular Components**: Files like `gyrogimbal.py` for stabilization, `frictionvibe.py` for vibration damping, `telemetry.py` for logging, and `ribit.py` for structural ribbing.
+- **Interactive Tools**: Supports simulations for bead length, arc length, voltage, amperage, and gas mixtures in welding.
+- **Testing and Adaptations**: Includes test suites for simulation validation and stubs for BOM (Bill of Materials) and manufacturer hooks.
 
 ## Installation
-Prerequisites
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/kappasha.git
+   cd kappasha
+   ```
 
-Python 3.8 or higher
-pip (Python package manager)
-A virtual environment (recommended)
+2. Create and activate a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
-## Dependencies
-Install the required Python packages using:
-pip install numpy matplotlib mpl_toolkits scipy
+3. Install dependencies:
+   ```bash
+   pip install numpy matplotlib scipy pandas pytest
+   ```
 
-Optional dependency for HTML export:
-pip install mpld3
-
-## Setup
-
-Clone or download the repository to your local machine:
-git clone https://github.com/yourusername/tetrasurfaces.git
-cd tetra
-
-
-Create and activate a virtual environment:
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-Install dependencies:
-pip install -r requirements.txt
-
-If requirements.txt is not provided, manually install the dependencies listed above.
-
-Ensure the tetra directory contains all necessary modules:
-
-tetra.py
-
-KappaSHA256.py
-
-kappa_grid.py
-
-green_curve.py
-
-temperature_salt.py
-
-forge_telemetry.py
-
-tests/test_simulation.py
+4. Optional for advanced features (e.g., 3D modeling, HTML export):
+   ```bash
+   pip install mpl_toolkits mpld3 opencv-python pyserial
+   ```
 
 ## Usage
-Run the main application:
+The core functionality is in the `tetrasurfaces` subdirectory. Run simulations using Python scripts:
 
-cd tetra
-python tetra.py
+- **Basic Surface Simulation**:
+  ```bash
+  python tetrasurfaces/fractal_tetra.py
+  ```
 
+- **Welding Simulation**:
+  ```bash
+  python tetrasurfaces/welding.py --env garage --material mild_steel
+  ```
+  This models a welding sequence with options for preheating, bead length, and environmental factors.
 
-## Interactive Controls
+- **Porosity Modeling**:
+  Use `ribit.py` and `telemetry.py` to simulate porosity:
+  ```bash
+  python tetrasurfaces/ribit.py --mesh W21x62
+  python tetrasurfaces/telemetry.py --log porosity
+  ```
 
-R: Toggle draw mode to add kappa nodes for custom curves.
-A: Toggle protractor tool for angle measurements.
-M: Toggle ruler tool for distance measurements.
-D: Toggle dimension tool to label curve lengths.
-C: Close the polyhedron manually to generate a 3D model.
-G: Convert selected curve to construction geometry.
-H: Hide or show selected or all hidden elements.
-E: Reset the canvas.
-S: Export the 3D model as an STL file.
-F: Toggle visibility of harmonic frequency labels.
+- **Interactive 3D Modeling**:
+  Run `tetra.py` for interactive visualization:
+  ```bash
+  python tetra.py
+  ```
+  Use sliders to adjust curvature, height, and fractal levels.
 
-## Sliders
-Adjust parameters in the control window:
+For custom adaptations, edit files like `gyrogimbal.py` for gyroscopic modeling or `frictionvibe.py` for vibration damping.
 
-Curvature (kappa): Controls the curvature of the green curve.
-Height: Sets the height of the 3D model.
-Rings: Number of loft rings in the 3D model.
-Fractal Level: Depth of fractal flower recursion.
-Radial/Tangential/Height Chord: Parameters for flower-like surface modulation.
+## Code List of Generations and Adaptations Needed for Tetrasurfaces
+The tetrasurfaces subdirectory requires the following generations and adaptations for full functionality:
 
-## Outputs
+1. **Core Files Generation**:
+   - `fractal_tetra.py`: Generate fractal tetrahedral patterns for surface growth simulations.
+   - `ribit.py` and `ribitstructure.py`: Create tetrahedral ribbing for stiffeners in case-hardened layers.
+   - `gyrogimbal.py`: Implement gyroscope integration for motion smoothing and torque modeling.
+   - `frictionvibe.py`: Model friction and vibration damping for porosity changes.
+   - `telemetry.py`: Log mesh data, porosity metrics, and stresses during transformations.
 
-G-code: Saved as model.gcode when a closed curve is created.
-STL: Saved as model.stl when pressing 'S' with a 3D model.
-HTML: Saved as mersenne_plot.html if mpld3 is installed.
+2. **Adaptations**:
+   - Integrate TetWild for 3D meshing into `ribit.py` to track porosity spikes (up to 30%).
+   - Add phase-field scripts to `telemetry.py` for void growth simulation under heat.
+   - Tweak `frictionvibe.py` for better porosity resolution with recent friction coefficient uploads.
+   - Hack `fractal_tetra.py` to simulate uneven martensite layers and porosity buildup.
+   - Blend `ribitstructure.py` grids with `telemetry.py` for hashing output in real-time.
 
+3. **Extensions**:
+   - Add `--env` flag to `welding.py` for garage/outdoor simulations with wind and smoke modeling.
+   - Implement `--rays` flag in `telemetry.py` for light physics (UV/IR ray tracing).
+   - Create `weldtest.py` for testing preheat vs. non-preheat scenarios with crack simulation.
 
-## Troubleshooting Tests
-If you encounter a ModuleNotFoundError for kappa_grid:
+4. **Dependencies**:
+   - Use `numpy` for numerical computations and grid generation.
+   - `matplotlib` for 2D/3D visualizations.
+   - `scipy` for physics modeling.
+   - `pytest` for testing.
 
-Ensure kappa_grid.py exists in the tetra/ directory.
-Verify the Python path includes the project root:export PYTHONPATH=$PYTHONPATH:/path/to/kappasha
+## Testing
+Run the test suite:
+```bash
+cd tetrasurfaces
+pytest tests/test_simulation.py -v
+```
 
-
-Install missing dependencies (e.g., mpld3 for HTML export):pip install mpld3
-
-
+If encountering import errors, ensure the `PYTHONPATH` includes the project root:
+```bash
+export PYTHONPATH=$PYTHONPATH:/path/to/kappasha/tetrasurfaces
+```
 
 ## License
-Kappasha is dual-licensed under the Apache License, Version 2.0, and the GNU Affero General Public License v3.0 or later. See the license headers in each source file for details.
-Copyright © 2025 Beau Ayres
+Kappasha is dual-licensed under the Apache License 2.0 and GNU Affero General Public License v3.0 or later. See the file headers for details. Unauthorized use is prohibited without permission from Beau Ayres.
+
+Copyright 2025 Beau Ayres
+
 ## Contributing
-Contributions are welcome! Please submit pull requests or open issues on the repository https://github.com/tetrasurfaces/kappasha.
+Contributions are welcome. Fork the repo, make changes, and submit a pull request. Focus on improving porosity modeling, welding simulations, or adding new features like real-time ray tracing.
+
 ## Contact
-For questions or support, contact the maintainer at tetrasurfaces or open an issue on the repository.
+For issues or suggestions, open an issue on GitHub or contact Beau Ayres.
