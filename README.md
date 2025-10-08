@@ -1,4 +1,4 @@
-# Kappasha
+## Kappasha
 Kappasha is an interactive Python application for visualizing Mersenne prime curves, golden spirals, and 3D fractal surfaces with curvature modulation. It uses Matplotlib for 2D and 3D plotting, incorporating geometric constructions, harmonic frequency annotations, and user-defined curves. The project supports tools like protractors, rulers, and G-code generation for CNC applications, with a focus on computational geometry and curvature continuity.
 Features
 
@@ -10,21 +10,21 @@ G-code Export: Generates G-code for 2D curves with variable feed rates for CNC a
 STL Export: Exports 3D models as STL files for 3D printing.
 HTML Export: Saves interactive 2D plots as HTML using mpld3 (optional).
 
-Installation
+# Installation
 Prerequisites
 
 Python 3.8 or higher
 pip (Python package manager)
 A virtual environment (recommended)
 
-Dependencies
+# Dependencies
 Install the required Python packages using:
 pip install numpy matplotlib mpl_toolkits scipy
 
 Optional dependency for HTML export:
 pip install mpld3
 
-Setup
+# Setup
 
 Clone or download the repository to your local machine:
 git clone https://github.com/yourusername/tetrasurfaces.git
@@ -56,13 +56,14 @@ forge_telemetry.py
 
 tests/test_simulation.py
 
-Usage
+# Usage
 Run the main application:
 
 cd tetra
 python tetra.py
 
-Interactive Controls
+
+# Interactive Controls
 
 R: Toggle draw mode to add kappa nodes for custom curves.
 A: Toggle protractor tool for angle measurements.
@@ -75,7 +76,7 @@ E: Reset the canvas.
 S: Export the 3D model as an STL file.
 F: Toggle visibility of harmonic frequency labels.
 
-Sliders
+# Sliders
 Adjust parameters in the control window:
 
 Curvature (kappa): Controls the curvature of the green curve.
@@ -84,14 +85,14 @@ Rings: Number of loft rings in the 3D model.
 Fractal Level: Depth of fractal flower recursion.
 Radial/Tangential/Height Chord: Parameters for flower-like surface modulation.
 
-Outputs
+# Outputs
 
 G-code: Saved as model.gcode when a closed curve is created.
 STL: Saved as model.stl when pressing 'S' with a 3D model.
 HTML: Saved as mersenne_plot.html if mpld3 is installed.
 
 
-Troubleshooting Tests
+# Troubleshooting Tests
 If you encounter a ModuleNotFoundError for kappa_grid:
 
 Ensure kappa_grid.py exists in the tetra/ directory.
