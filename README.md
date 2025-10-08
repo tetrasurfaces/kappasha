@@ -41,12 +41,19 @@ pip install -r requirements.txt
 If requirements.txt is not provided, manually install the dependencies listed above.
 
 Ensure the tetra directory contains all necessary modules:
+
 tetra.py
+
 KappaSHA256.py
+
 kappa_grid.py
+
 green_curve.py
+
 temperature_salt.py
+
 forge_telemetry.py
+
 tests/test_simulation.py
 
 Usage
