@@ -103,10 +103,10 @@ Install missing dependencies (e.g., mpld3 for HTML export):pip install mpld3
 
 
 
-License
+## License
 Kappasha is dual-licensed under the Apache License, Version 2.0, and the GNU Affero General Public License v3.0 or later. See the license headers in each source file for details.
 Copyright © 2025 Beau Ayres
-Contributing
+## Contributing
 Contributions are welcome! Please submit pull requests or open issues on the repository https://github.com/tetrasurfaces/kappasha.
-Contact
+## Contact
 For questions or support, contact the maintainer at tetrasurfaces or open an issue on the repository.
