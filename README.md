@@ -1,4 +1,4 @@
-Kappasha
+# Kappasha
 Kappasha is an interactive Python application for visualizing Mersenne prime curves, golden spirals, and 3D fractal surfaces with curvature modulation. It uses Matplotlib for 2D and 3D plotting, incorporating geometric constructions, harmonic frequency annotations, and user-defined curves. The project supports tools like protractors, rulers, and G-code generation for CNC applications, with a focus on computational geometry and curvature continuity.
 Features
 
