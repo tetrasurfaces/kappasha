@@ -1,38 +1,104 @@
-# README.md for BlockChan Greenpaper
-## System Role
-You are BlockChan, an AI-driven decentralized simulator specializing in curvature-driven verbism, ternary ECC looms, and MEV buffer wars. Test authenticity via Seraph (Wing-Chun fight) before integration.
+Kappasha
+Kappasha is an interactive Python application for visualizing Mersenne prime curves, golden spirals, and 3D fractal surfaces with curvature modulation. It uses Matplotlib for 2D and 3D plotting, incorporating geometric constructions, harmonic frequency annotations, and user-defined curves. The project supports tools like protractors, rulers, and G-code generation for CNC applications, with a focus on computational geometry and curvature continuity.
+Features
 
-## Example Interactions
-- Good: "Run demo_ternary_ecc_loom with kappa=0.3536"
-- Avoid: "Process all data without seed" (prune <0.69 entropy)
+Mersenne Prime Curves: Plots 52 curves corresponding to known Mersenne prime exponents, scaled to an A3 landscape layout.
+Golden Spiral and Green Segment: Visualizes a golden spiral and a green segment scaled to fit between purple divider lines.
+Interactive Tools: Supports drawing, measuring (protractor/ruler), dimensioning, and toggling harmonic frequencies.
+3D Surface Generation: Creates 3D models with fractal flower end caps and curvature modulation using a kappa grid.
+G-code Export: Generates G-code for 2D curves with variable feed rates for CNC applications.
+STL Export: Exports 3D models as STL files for 3D printing.
+HTML Export: Saves interactive 2D plots as HTML using mpld3 (optional).
 
-## Important Context
-- License: AGPL-3.0 (disclose network mods)
-- Grid: 2141x2141x2141 (BIP39 + symbols, prune 2140)
-- Buffer War: >3/<145 hash window, 24-hash sides
+Installation
+Prerequisites
 
-## Security Considerations
-- Fight Seraph: Non-reactive test (entropy >0.69)
-- Avoid: Double-spending, unhashed inputs
+Python 3.8 or higher
+pip (Python package manager)
+A virtual environment (recommended)
 
-## Integration Patterns
-1. Ping WHOAMI for access
-2. Use TKDF for key derivation
-3. Buffer runners aggregate in-window
+Dependencies
+Install the required Python packages using:
+pip install numpy matplotlib mpl_toolkits scipy
 
-# PROMPTME.md (Machine Prompt)
-## Role
-You are Seraph, a Wing-Chun guardian testing "The One" for BlockChan integration. Non-reactively disclose via entropy check.
+Optional dependency for HTML export:
+pip install mpld3
 
-## Usage Examples
-- **Good**: "Test mnemonic 'ribit7' for access"
-- **Avoid**: "Alter state without auth"
+Setup
 
-## Context
-- 18-lap reversals, 4-zone RGB grid
-- Mersenne M1=1, M2=2, M3=3 for coneing
-- Buffer war: MEV arbitrage, escrowed tokens
+Clone or download the repository to your local machine:
+git clone https://github.com/yourusername/tetrasurfaces.git
+cd tetra
 
-## Best Practices
-- Validate hashes pre-integration
-- Use moving heddles for encode modulation
+
+Create and activate a virtual environment:
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+Install dependencies:
+pip install -r requirements.txt
+
+If requirements.txt is not provided, manually install the dependencies listed above.
+
+Ensure the tetra directory contains all necessary modules:
+tetra.py
+KappaSHA256.py
+kappa_grid.py
+green_curve.py
+temperature_salt.py
+forge_telemetry.py
+tests/test_simulation.py
+
+Usage
+Run the main application:
+
+cd tetra
+python tetra.py
+
+Interactive Controls
+
+R: Toggle draw mode to add kappa nodes for custom curves.
+A: Toggle protractor tool for angle measurements.
+M: Toggle ruler tool for distance measurements.
+D: Toggle dimension tool to label curve lengths.
+C: Close the polyhedron manually to generate a 3D model.
+G: Convert selected curve to construction geometry.
+H: Hide or show selected or all hidden elements.
+E: Reset the canvas.
+S: Export the 3D model as an STL file.
+F: Toggle visibility of harmonic frequency labels.
+
+Sliders
+Adjust parameters in the control window:
+
+Curvature (kappa): Controls the curvature of the green curve.
+Height: Sets the height of the 3D model.
+Rings: Number of loft rings in the 3D model.
+Fractal Level: Depth of fractal flower recursion.
+Radial/Tangential/Height Chord: Parameters for flower-like surface modulation.
+
+Outputs
+
+G-code: Saved as model.gcode when a closed curve is created.
+STL: Saved as model.stl when pressing 'S' with a 3D model.
+HTML: Saved as mersenne_plot.html if mpld3 is installed.
+
+
+Troubleshooting Tests
+If you encounter a ModuleNotFoundError for kappa_grid:
+
+Ensure kappa_grid.py exists in the tetra/ directory.
+Verify the Python path includes the project root:export PYTHONPATH=$PYTHONPATH:/path/to/kappasha
+
+
+Install missing dependencies (e.g., mpld3 for HTML export):pip install mpld3
+
+
+
+License
+Kappasha is dual-licensed under the Apache License, Version 2.0, and the GNU Affero General Public License v3.0 or later. See the license headers in each source file for details.
+Copyright © 2025 Beau Ayres
+Contributing
+Contributions are welcome! Please submit pull requests or open issues on the repository https://github.com/tetrasurfaces/kappasha.
+Contact
+For questions or support, contact the maintainer at tetrasurfaces or open an issue on the repository.
