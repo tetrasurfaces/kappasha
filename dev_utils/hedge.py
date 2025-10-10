@@ -36,8 +36,17 @@
 # SPDX-License-Identifier: Apache-2.0
 
 def hedge(curve, path):
-    """Hedge path with ThoughtCurve tangent check."""
+    """Hedge single path with ThoughtCurve tangent check."""
     if len(path) < 2:
         return "hold"
     tangent, _ = curve.spiral_tangent(path[-2], path[-1])
     return "unwind" if tangent else "hold"
+
+def multi_hedge(curve, paths):
+    """Hedge multiple paths, return best option."""
+    options = []
+    for p1, p2 in paths:
+        tangent, _ = curve.spiral_tangent(p1, p2)
+        options.append(("unwind" if tangent else "hold", p2))
+    stable = [p for act, p in options if act == "hold"]
+    return "unwind" if not stable else f"hold on {stable[0]}"
