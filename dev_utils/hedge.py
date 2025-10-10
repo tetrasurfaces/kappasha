@@ -43,10 +43,12 @@ def hedge(curve, path):
     return "unwind" if tangent else "hold"
 
 def multi_hedge(curve, paths):
-    """Hedge multiple paths, return best option."""
+    """Hedge multiple paths, suggest alternates on arbitrage."""
     options = []
     for p1, p2 in paths:
         tangent, _ = curve.spiral_tangent(p1, p2)
         options.append(("unwind" if tangent else "hold", p2))
     stable = [p for act, p in options if act == "hold"]
-    return "unwind" if not stable else f"hold on {stable[0]}"
+    if not stable:
+        return "unwind, suggest alternate paths"
+    return f"hold on {stable[0]}, alternates: {', '.join(stable[1:])}"
