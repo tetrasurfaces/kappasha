@@ -44,6 +44,7 @@ from thought_curve import ThoughtCurve
 from arch_utils.render import render
 from dev_utils.lockout import lockout
 from dev_utils.hedge import hedge
+from dev_utils.grep import grep
 
 class KappashaOS:
     def __init__(self):
@@ -100,8 +101,21 @@ class KappashaOS:
                 lockout(self.factory, target)
             except:
                 print("usage: dev_utils lockout gas_line")
+        elif cmd.startswith("kappa grep"):
+            try:
+                pattern = cmd.split(maxsplit=2)[2]
+                matches = grep(self.factory.history, pattern)
+                if matches:
+                    self.hand.pulse(len(matches))  # Pulse per match
+                    print(f"Grep found {len(matches)} matches:")
+                    for m in matches[:3]:  # Limit output
+                        print(f" - {m}")
+                else:
+                    print("No matches found.")
+            except:
+                print("usage: kappa grep /warp=0.2+/")
         else:
-            print("kappa: ls | tilt 0.05 | cd logs | unlock (7,0,0) | arch_utils render | dev_utils lockout gas_line")
+            print("kappa: ls | tilt 0.05 | cd logs | unlock (7,0,0) | arch_utils render | dev_utils lockout gas_line | grep /warp=0.2+/")
 
     def run_day(self):
         """Simulate a factory day with kappa navigation."""
@@ -111,6 +125,7 @@ class KappashaOS:
         self.factory.register_kappa("gas_rupture")
         self.run_command("kappa cd weld")
         self.run_command("kappa unlock (7,0,0)")
+        self.run_command("kappa grep /gas_rupture/")
         yield self.env.process(self.factory.auto_rig("gas_line"))
         self.run_command("kappa ls")
         self.run_command("arch_utils render")
