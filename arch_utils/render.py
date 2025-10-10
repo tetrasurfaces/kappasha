@@ -40,7 +40,7 @@ from tetras import fractal_tetra
 import struct
 
 def render(grid, kappa, surface_id="grid"):
-    """Render rhombus voxel grid as STL with kappa tilt."""
+    """Render rhombus voxel grid as STL with dynamic kappa tilt."""
     triangles = []
     for i in range(grid.shape[0] - 1):
         for j in range(grid.shape[1] - 1):
@@ -50,8 +50,8 @@ def render(grid, kappa, surface_id="grid"):
                     p1 = np.array([i + 1, j, k])
                     p2 = np.array([i, j + 1, k])
                     p3 = np.array([i, j, k + 1])
-                    # Kappa tilt
-                    tilt_mat = np.array([[1, 0, -kappa], [0, 1, -kappa], [0, 0, 1]])
+                    # Dynamic kappa tilt
+                    tilt_mat = np.array([[1, 0, -kappa * (1 + np.sin(i/4))], [0, 1, -kappa * (1 + np.cos(j/4))], [0, 0, 1]])
                     p0 = tilt_mat @ p0
                     p1 = tilt_mat @ p1
                     p2 = tilt_mat @ p2
@@ -61,10 +61,10 @@ def render(grid, kappa, surface_id="grid"):
     # Add fractal tetra for depth
     tetra_mesh = fractal_tetra(surface_id, kappa)
     triangles.extend(tetra_mesh)
-    # Mock STL export
-    filename = f"surface_{surface_id}.stl"
+    # Dynamic STL export
+    filename = f"surface_{surface_id}_{int(kappa*100)}.stl"
     with open(filename, 'wb') as f:
-        f.write(f"ID: {surface_id}".ljust(80, ' ').encode('utf-8'))
+        f.write(f"ID: {surface_id}_kappa{kappa:.2f}".ljust(80, ' ').encode('utf-8'))
         f.write(struct.pack('<I', len(triangles)))
         for tri in triangles:
             v1 = np.array(tri[1]) - np.array(tri[0])
@@ -76,5 +76,5 @@ def render(grid, kappa, surface_id="grid"):
             for p in tri:
                 f.write(struct.pack('<3f', *p))
             f.write(struct.pack('<H', 0))
-    print(f"arch_utils: Rendered rhombus grid to {filename}")
+    print(f"arch_utils: Rendered dynamic rhombus grid to {filename}")
     return filename
