@@ -40,7 +40,7 @@ from tetras import fractal_tetra
 import struct
 
 def render(grid, kappa, surface_id="grid"):
-    """Render rhombus voxel grid as STL with dynamic kappa tilt."""
+    """Render rhombus voxel grid as STL with dynamic kappa tilt, mark decision clashes."""
     triangles = []
     for i in range(grid.shape[0] - 1):
         for j in range(grid.shape[1] - 1):
@@ -50,12 +50,15 @@ def render(grid, kappa, surface_id="grid"):
                     p1 = np.array([i + 1, j, k])
                     p2 = np.array([i, j + 1, k])
                     p3 = np.array([i, j, k + 1])
-                    # Dynamic kappa tilt
+                    # Dynamic kappa tilt with decision clash shading
                     tilt_mat = np.array([[1, 0, -kappa * (1 + np.sin(i/4))], [0, 1, -kappa * (1 + np.cos(j/4))], [0, 0, 1]])
                     p0 = tilt_mat @ p0
                     p1 = tilt_mat @ p1
                     p2 = tilt_mat @ p2
                     p3 = tilt_mat @ p3
+                    # Mock decision clash (e.g., if kappa > 0.3, shade red)
+                    if kappa > 0.3:
+                        p0[2] += 0.5  # Lift for visual clash
                     triangles.append([p0, p1, p2])
                     triangles.append([p0, p2, p3])
     # Add fractal tetra for depth
@@ -76,5 +79,5 @@ def render(grid, kappa, surface_id="grid"):
             for p in tri:
                 f.write(struct.pack('<3f', *p))
             f.write(struct.pack('<H', 0))
-    print(f"arch_utils: Rendered dynamic rhombus grid to {filename}")
+    print(f"arch_utils: Rendered dynamic rhombus grid to {filename} with decision clashes")
     return filename
