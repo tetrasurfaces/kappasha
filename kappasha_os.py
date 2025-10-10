@@ -41,65 +41,9 @@ from nav3d import RhombusNav
 from factory_sim import FactorySim
 from ghost_hand import GhostHand
 from thought_curve import ThoughtCurve
-from tetras import fractal_tetra  # For rhombus grid rendering
-import struct
-
-class arch_utils:
-    @staticmethod
-    def render(grid, kappa, surface_id="grid"):
-        """Render rhombus voxel grid as STL with kappa tilt."""
-        triangles = []
-        for i in range(grid.shape[0] - 1):
-            for j in range(grid.shape[1] - 1):
-                for k in range(grid.shape[2] - 1):
-                    if grid[i, j, k] > 0:  # Active voxel
-                        p0 = np.array([i, j, k])
-                        p1 = np.array([i + 1, j, k])
-                        p2 = np.array([i, j + 1, k])
-                        p3 = np.array([i, j, k + 1])
-                        # Kappa tilt
-                        tilt_mat = np.array([[1, 0, -kappa], [0, 1, -kappa], [0, 0, 1]])
-                        p0 = tilt_mat @ p0
-                        p1 = tilt_mat @ p1
-                        p2 = tilt_mat @ p2
-                        p3 = tilt_mat @ p3
-                        triangles.append([p0, p1, p2])
-                        triangles.append([p0, p2, p3])
-        # Add fractal tetra for depth
-        tetra_mesh = fractal_tetra(surface_id, kappa)
-        triangles.extend(tetra_mesh)
-        # Mock STL export
-        filename = f"surface_{surface_id}.stl"
-        with open(filename, 'wb') as f:
-            f.write(f"ID: {surface_id}".ljust(80, ' ').encode('utf-8'))
-            f.write(struct.pack('<I', len(triangles)))
-            for tri in triangles:
-                v1 = np.array(tri[1]) - np.array(tri[0])
-                v2 = np.array(tri[2]) - np.array(tri[0])
-                normal = np.cross(v1, v2)
-                norm_len = np.linalg.norm(normal)
-                normal = normal / norm_len if norm_len > 0 else np.array([0.0, 0.0, 1.0])
-                f.write(struct.pack('<3f', *normal))
-                for p in tri:
-                    f.write(struct.pack('<3f', *p))
-                f.write(struct.pack('<H', 0))
-        print(f"arch_utils: Rendered rhombus grid to {filename}")
-        return filename
-
-class dev_utils:
-    @staticmethod
-    def lockout(factory, target):
-        """Trigger lockout on target with kappa awareness."""
-        factory.trigger_emergency(target)
-        print(f"dev_utils: Locked out {target}")
-
-    @staticmethod
-    def hedge(curve, path):
-        """Hedge path with ThoughtCurve tangent check."""
-        if len(path) < 2:
-            return "hold"
-        tangent, _ = curve.spiral_tangent(path[-2], path[-1])
-        return "unwind" if tangent else "hold"
+from arch_utils.render import render
+from dev_utils.lockout import lockout
+from dev_utils.hedge import hedge
 
 class KappashaOS:
     def __init__(self):
@@ -133,7 +77,7 @@ class KappashaOS:
             try:
                 path = cmd.split()[2]
                 self.nav.path.append(path)
-                hedge_action = dev_utils.hedge(self.curve, self.nav.path)
+                hedge_action = hedge(self.curve, self.nav.path)
                 if hedge_action == "unwind":
                     self.hand.pulse(3)
                     print("Path hedge: unwind")
@@ -148,12 +92,12 @@ class KappashaOS:
             except:
                 print("usage: kappa unlock (7,0,0)")
         elif cmd == "arch_utils render":
-            filename = arch_utils.render(self.nav.grid, self.nav.kappa)
+            filename = render(self.nav.grid, self.nav.kappa)
             print(f"arch_utils: Rendered to {filename}")
         elif cmd.startswith("dev_utils lockout"):
             try:
                 target = cmd.split()[2]
-                dev_utils.lockout(self.factory, target)
+                lockout(self.factory, target)
             except:
                 print("usage: dev_utils lockout gas_line")
         else:
