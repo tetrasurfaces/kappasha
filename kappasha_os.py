@@ -46,6 +46,7 @@ from dev_utils.lockout import lockout
 from dev_utils.hedge import hedge, multi_hedge
 from dev_utils.grep import grep
 from dev_utils.thought_arb import thought_arb
+import kappasha_os_cython  # Cython-optimized functions
 
 class KappashaOS:
     def __init__(self):
@@ -77,7 +78,7 @@ class KappashaOS:
         """Execute CLI commands with kappa awareness."""
         self.commands.append(cmd)
         if cmd == "kappa ls":
-            front, right, top = self.nav.project_third_angle()
+            front, right, top = kappasha_os_cython.project_third_angle(self.nav.grid, self.nav.kappa)  # Cython call
             print("FRONT:\n", front[:3, :3])
             print("RIGHT:\n", right[:3, :3])
             print("TOP:\n", top[:3, :3])
@@ -148,12 +149,12 @@ class KappashaOS:
         elif cmd.startswith("kappa decide"):
             try:
                 intent = cmd.split()[2]
-                action = thought_arb(self.curve, self.factory.history, intent)
+                action = kappasha_os_cython.thought_arb_cython(self.curve, self.factory.history, intent)  # Cython call
                 self.decisions.append((self.env.now, intent, action))
                 self.hand.pulse(2 if action == "unwind" else 1)
                 print(f"Decision: {intent} - {action}")
                 if action == "unwind":
-                    self.nav.kappa += 0.05  # Adjust kappa on arbitrage
+                    self.nav.kappa += 0.05
                     print(f"Kappa adjusted to {self.nav.kappa:.3f} due to arbitrage")
             except:
                 print("usage: kappa decide weld")
