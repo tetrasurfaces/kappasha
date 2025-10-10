@@ -40,8 +40,11 @@ from solidworks_api import SolidWorksAPI  # Hypothetical, use COM API
 from rhinoinside import GrasshopperAPI    # Hypothetical, use Rhino Python
 from keyshot_api import KeyshotAPI        # Hypothetical, use Keyshot Python
 
-def read_config(config_file="config.json"):
+def read_config(config_file="config/config.json"):
     """Read intent and commercial use from config file with error handling."""
+    config_dir = os.path.dirname(config_file)
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
     if not os.path.exists(config_file):
         print(f"Config file {config_file} not found. Creating default.")
         write_config("none", False, config_file)
@@ -63,9 +66,12 @@ def read_config(config_file="config.json"):
         write_config("none", False, config_file)
         return None, False
 
-def write_config(intent, commercial_use, config_file="config.json"):
+def write_config(intent, commercial_use, config_file="config/config.json"):
     """Write intent and commercial use to config file with error handling."""
     config = {"intent": intent, "commercial_use": commercial_use}
+    config_dir = os.path.dirname(config_file)
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
     try:
         with open(config_file, "w") as f:
             json.dump(config, f, indent=4)
