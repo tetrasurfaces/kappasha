@@ -37,10 +37,18 @@ from solidworks_api import SolidWorksAPI  # Hypothetical, use COM API
 from rhinoinside import GrasshopperAPI    # Hypothetical, use Rhino Python
 from keyshot_api import KeyshotAPI        # Hypothetical, use Keyshot Python
 
-def check_license(commercial_use=False, email_approved=False):
-    """Ensure license compliance before processing."""
-    if commercial_use and not email_approved:
-        raise ValueError("Commercial use requires email approval from Beau Ayres.")
+def check_license(commercial_use=False, intent=None):
+    """Ensure license compliance and intent declaration before processing."""
+    if intent not in ["educational", "commercial"]:
+        notice = """
+        NOTICE: You must declare your intent to use this software.
+        - For educational use (e.g., university training), open a GitHub issue at github.com/tetrasurfaces/issues using the Educational License Request template.
+        - For commercial use (e.g., branding, molding), use the Commercial License Request template.
+        See NOTICE.txt for details. Do not share proprietary details in public issues.
+        """
+        raise ValueError(f"Invalid or missing intent. {notice}")
+    if commercial_use and intent != "commercial":
+        raise ValueError("Commercial use requires 'commercial' intent and a negotiated license via github.com/tetrasurfaces/issues.")
     return True
 
 def generate_tetra_surface(resolution=100):
@@ -64,7 +72,7 @@ def etch_hash(mesh, hash_value):
     mesh.GetFieldData().AddArray(metadata)
     return mesh
 
-def apply_bump_map(keyshot, mesh, bump_strength=0.5, light_angle=0):
+def apply_bump_map(keyshot, mesh, bump_strength=0.7, light_angle=45):
     """Apply bump map in Keyshot, adjust with light slicks."""
     keyshot.load_mesh(mesh)
     keyshot.apply_bump_map(strength=bump_strength, normal_map=True)
@@ -88,8 +96,8 @@ def import_clay_scan(stl_file):
     reader.Update()
     return reader.GetOutput()
 
-def main(commercial_use=False, email_approved=False):
-    check_license(commercial_use, email_approved)
+def main(intent=None, commercial_use=False):
+    check_license(commercial_use, intent)
     mesh = generate_tetra_surface(resolution=100)
     kappa = calc_kappa(mesh)
     if max(kappa) > 0.5:  # Arbitrary moldability threshold
@@ -98,7 +106,7 @@ def main(commercial_use=False, email_approved=False):
     mesh = etch_hash(mesh, hash_value)
     
     keyshot = KeyshotAPI()
-    bump_params = apply_bump_map(keyshot, mesh, bump_strength=0.7, light_angle=45)
+    bump_params = apply_bump_map(keyshot, mesh)
     mesh = sync_cad(bump_params, mesh, cad_type="rhino")
     
     # Optional clay scan integration
@@ -112,4 +120,5 @@ def main(commercial_use=False, email_approved=False):
     writer.Write()
 
 if __name__ == "__main__":
-    main()
+    # Example: intent should come from config or user input
+    main(intent="educational")
