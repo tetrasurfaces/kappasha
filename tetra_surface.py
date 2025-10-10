@@ -32,10 +32,40 @@
 
 import numpy as np
 import vtk
+import json
+import os
+from datetime import datetime
 from kappasha256 import hash_surface
 from solidworks_api import SolidWorksAPI  # Hypothetical, use COM API
 from rhinoinside import GrasshopperAPI    # Hypothetical, use Rhino Python
 from keyshot_api import KeyshotAPI        # Hypothetical, use Keyshot Python
+
+def read_config(config_file="config.json"):
+    """Read intent and commercial use from config file."""
+    if not os.path.exists(config_file):
+        return None, False
+    try:
+        with open(config_file, "r") as f:
+            config = json.load(f)
+        return config.get("intent"), config.get("commercial_use", False)
+    except Exception as e:
+        print(f"Error reading config: {e}")
+        return None, False
+
+def write_config(intent, commercial_use, config_file="config.json"):
+    """Write intent and commercial use to config file."""
+    config = {"intent": intent, "commercial_use": commercial_use}
+    try:
+        with open(config_file, "w") as f:
+            json.dump(config, f, indent=4)
+    except Exception as e:
+        print(f"Error writing config: {e}")
+
+def log_license_check(result, intent, commercial_use):
+    """Log license check results for audit trail."""
+    with open("license_log.txt", "a") as f:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write(f"[{timestamp}] License Check: {result}, Intent: {intent}, Commercial: {commercial_use}\n")
 
 def check_license(commercial_use=False, intent=None):
     """Ensure license compliance and intent declaration before processing."""
@@ -46,9 +76,13 @@ def check_license(commercial_use=False, intent=None):
         - For commercial use (e.g., branding, molding), use the Commercial License Request template.
         See NOTICE.txt for details. Do not share proprietary details in public issues.
         """
+        log_license_check("Failed: Invalid or missing intent", intent, commercial_use)
         raise ValueError(f"Invalid or missing intent. {notice}")
     if commercial_use and intent != "commercial":
-        raise ValueError("Commercial use requires 'commercial' intent and a negotiated license via github.com/tetrasurfaces/issues.")
+        notice = "Commercial use requires 'commercial' intent and a negotiated license via github.com/tetrasurfaces/issues."
+        log_license_check("Failed: Commercial use without commercial intent", intent, commercial_use)
+        raise ValueError(notice)
+    log_license_check("Passed", intent, commercial_use)
     return True
 
 def generate_tetra_surface(resolution=100):
@@ -96,7 +130,14 @@ def import_clay_scan(stl_file):
     reader.Update()
     return reader.GetOutput()
 
-def main(intent=None, commercial_use=False):
+def main():
+    # Read intent from config
+    intent, commercial_use = read_config()
+    if not intent:
+        intent = input("Enter intent (educational/commercial): ").strip().lower()
+        commercial_use = intent == "commercial"
+        write_config(intent, commercial_use)
+    
     check_license(commercial_use, intent)
     mesh = generate_tetra_surface(resolution=100)
     kappa = calc_kappa(mesh)
@@ -120,5 +161,4 @@ def main(intent=None, commercial_use=False):
     writer.Write()
 
 if __name__ == "__main__":
-    # Example: intent should come from config or user input
-    main(intent="educational")
+    main()
