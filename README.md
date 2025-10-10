@@ -1,18 +1,27 @@
 # README for Kappasha
 
 ## Overview
-Kappasha is a GitHub repository that serves as a fork of the hashlet project, blending surface mathematics with cryptographic elements. It focuses on modeling complex surfaces, such as tetrahedral meshes and fractal patterns, while incorporating hashing techniques for applications like porosity simulation in materials science and digital security. The project emerged from discussions on GitHub repos related to tetra surfaces, fractal tetra, and simulations for case hardening of steel, where "hashing" refers to both cryptographic hashing and phase transformation tracking in metallurgy.
+Kappasha is a GitHub repository forked from the original hashlet project, evolved into a kappa-tilted operating system (KappashaOS) blending computational geometry with real-time decision-making for factory environments. Inspired by tetrahedral meshes and fractal patterns, it models complex surfaces and integrates thought arbitrage—detecting intent-registry divergences—alongside welding simulations and environmental factors. Rooted in repos like `fractal_tetra` and steel case-hardening simulations, "hashing" tracks cryptographic data and material phase transformations.
 
-Kappasha is designed for developers and researchers interested in intersecting computational geometry, crypto tools, and physical simulations. It includes Python scripts for generating fractal patterns, modeling porosity in steel hardening, and integrating gyroscopic and friction models for real-world applications like welding and infrastructure.
+Designed for developers, welders, and researchers, KappashaOS intersects geometry, haptics, and physical simulations. It features Python scripts with Cython optimization for rhombus voxel grids, porosity modeling, and gyroscopic stabilization, tailored for welding, infrastructure monitoring, and material science.
 
 ## Features
-- **Surface Modeling**: Tools for tetrahedral meshing and fractal generation, inspired by repos like fractal_tetra.
-- **Porosity Simulation**: Models void growth during martensitic transformations in case hardening, with up to 30% porosity tracking.
-- **Hashing Integration**: Combines cryptographic hashing (e.g., for secure data) with "phase hashing" for tracking material transformations.
-- **Welding and Environmental Simulations**: Scripts for modeling welding sequences, preheating, cooling, and environmental factors like wind, smoke, and light reflections.
-- **Modular Components**: Files like `gyrogimbal.py` for stabilization, `frictionvibe.py` for vibration damping, `telemetry.py` for logging, and `ribit.py` for structural ribbing.
-- **Interactive Tools**: Supports simulations for bead length, arc length, voltage, amperage, and gas mixtures in welding.
-- **Testing and Adaptations**: Includes test suites for simulation validation and stubs for BOM (Bill of Materials) and manufacturer hooks.
+- **Kappa-Tilted Navigation**: 3D rhombus voxel grid with real-time kappa adjustments, Cython-optimized for speed.
+- **Thought Arbitrage**: Detects mismatches between user intent and factory registry, logged with Cython-enhanced checks.
+- **Welding Simulations**: Models sequences with preheating, bead length, arc length, voltage, amperage, and environmental factors (wind, smoke, light).
+- **Porosity and Material Tracking**: Simulates void growth during transformations, up to 30% porosity, with phase hashing.
+- **Haptic Feedback**: Integrates `ghost_hand` for tactile cues on kappa drifts or arbitrage flags.
+- **Modular Components**: 
+  - `arch_utils/render.py`: Dynamic STL rendering with decision clash shading.
+  - `dev_utils/lockout.py`: Tags incidents like gas ruptures.
+  - `dev_utils/hedge.py`: Suggests alternate paths on unwind.
+  - `dev_utils/grep.py`: Perl-style regex for log parsing.
+  - `dev_utils/thought_arb.py`: Implements thought arbitrage.
+  - `gyrogimbal.py`: Stabilizes motion with gyro data.
+  - `frictionvibe.py`: Models vibration damping.
+  - `telemetry.py`: Logs mesh and stress data.
+- **CLI Interface**: Commands like `kappa ls`, `kappa decide weld`, `kappa hedge multi [gate,weld]`, optimized with Cython.
+- **Testing and Logging**: Includes test stubs and decision history tracking.
 
 ## Installation
 1. Clone the repository:
@@ -29,91 +38,103 @@ Kappasha is designed for developers and researchers interested in intersecting c
 
 3. Install dependencies:
    ```bash
-   pip install numpy matplotlib scipy pandas pytest
+   pip install numpy matplotlib scipy pandas pytest simpy cython
    ```
 
-4. Optional for advanced features (e.g., 3D modeling, HTML export):
+4. Compile Cython modules:
    ```bash
-   pip install mpl_toolkits mpld3 opencv-python pyserial
+   python setup.py build_ext --inplace
+   ```
+
+5. Optional for advanced features (e.g., haptics, 3D export):
+   ```bash
+   pip install pyserial opencv-python
    ```
 
 ## Usage
-The core functionality is in the `tetrasurfaces` subdirectory. Run simulations using Python scripts:
+Run KappashaOS from the root directory. Core functionality spans `nav3d.py` and `kappasha_os.py`, with modules in `arch_utils` and `dev_utils`.
 
-- **Basic Surface Simulation**:
+- **Basic Navigation**:
   ```bash
-  python tetrasurfaces/fractal_tetra.py
+  python kappasha_os.py
   ```
+  Use `kappa ls` to view the optimized rhombus grid.
 
 - **Welding Simulation**:
   ```bash
-  python tetrasurfaces/welding.py --env garage --material mild_steel
+  python kappasha_os.py
   ```
-  This models a welding sequence with options for preheating, bead length, and environmental factors.
+  Run `kappa cd weld` to navigate, `dev_utils lockout gas_line` for incidents.
 
-- **Porosity Modeling**:
-  Use `ribit.py` and `telemetry.py` to simulate porosity:
+- **Decision-Making**:
   ```bash
-  python tetrasurfaces/ribit.py --mesh W21x62
-  python tetrasurfaces/telemetry.py --log porosity
+  python kappasha_os.py
   ```
+  Type `kappa decide weld` to check arbitrage, feel ghost_hand pulse.
 
-- **Interactive 3D Modeling**:
-  Run `tetra.py` for interactive visualization:
+- **Path Hedging**:
   ```bash
-  python tetra.py
+  python kappasha_os.py
   ```
-  Use sliders to adjust curvature, height, and fractal levels.
+  Use `kappa hedge multi [gate,weld]` for alternate suggestions.
 
-For custom adaptations, edit files like `gyrogimbal.py` for gyroscopic modeling or `frictionvibe.py` for vibration damping.
+- **Log Parsing**:
+  ```bash
+  python kappasha_os.py
+  ```
+  Run `kappa grep /gas_rupture/` to filter incidents.
 
-## Code List of Generations and Adaptations Needed for Tetrasurfaces
-The tetrasurfaces subdirectory requires the following generations and adaptations for full functionality:
+For custom tweaks, edit `arch_utils/render.py` for voxel rendering or `dev_utils/thought_arb.py` for arbitrage logic. Recompile after changes with `python setup.py build_ext --inplace`.
+
+## Code List of Generations and Adaptations Needed for KappashaOS
+The repository requires ongoing development:
 
 1. **Core Files Generation**:
-   - `fractal_tetra.py`: Generate fractal tetrahedral patterns for surface growth simulations.
-   - `ribit.py` and `ribitstructure.py`: Create tetrahedral ribbing for stiffeners in case-hardened layers.
-   - `gyrogimbal.py`: Implement gyroscope integration for motion smoothing and torque modeling.
-   - `frictionvibe.py`: Model friction and vibration damping for porosity changes.
-   - `telemetry.py`: Log mesh data, porosity metrics, and stresses during transformations.
+   - `nav3d.py`: Rhombus voxel navigation with kappa tilt.
+   - `kappasha_os.py`: OS integration with sensor polling and CLI.
+   - `kappasha_os_cython.pyx`: Cython-optimized projection and arbitrage.
+   - `gyrogimbal.py`: Gyroscopic stabilization for motion.
+   - `frictionvibe.py`: Vibration damping for porosity.
+   - `telemetry.py`: Log decisions and stresses.
 
 2. **Adaptations**:
-   - Integrate TetWild for 3D meshing into `ribit.py` to track porosity spikes (up to 30%).
-   - Add phase-field scripts to `telemetry.py` for void growth simulation under heat.
-   - Tweak `frictionvibe.py` for better porosity resolution with recent friction coefficient uploads.
-   - Hack `fractal_tetra.py` to simulate uneven martensite layers and porosity buildup.
-   - Blend `ribitstructure.py` grids with `telemetry.py` for hashing output in real-time.
+   - Enhance `thought_arb.py` with multi-intent arbitrage.
+   - Update `render.py` for real-time clash shading.
+   - Refine `hedge.py` for dynamic path prioritization.
+   - Integrate `grep.py` with sensor data parsing.
 
 3. **Extensions**:
-   - Add `--env` flag to `welding.py` for garage/outdoor simulations with wind and smoke modeling.
-   - Implement `--rays` flag in `telemetry.py` for light physics (UV/IR ray tracing).
-   - Create `weldtest.py` for testing preheat vs. non-preheat scenarios with crack simulation.
+   - Add `--env outdoor` to `kappasha_os.py` for wind/smoke sims.
+   - Implement `--rays` in `telemetry.py` for light tracing.
+   - Create `weldtest.py` for preheat vs. crack analysis.
 
 4. **Dependencies**:
-   - Use `numpy` for numerical computations and grid generation.
-   - `matplotlib` for 2D/3D visualizations.
-   - `scipy` for physics modeling.
+   - `numpy` for grid math.
+   - `matplotlib` for visualization.
+   - `scipy` for physics.
+   - `simpy` for simulation.
+   - `cython` for optimization.
    - `pytest` for testing.
 
 ## Testing
 Run the test suite:
 ```bash
-cd tetrasurfaces
-pytest tests/test_simulation.py -v
+cd kappashaos
+pytest tests/test_os.py -v
 ```
 
-If encountering import errors, ensure the `PYTHONPATH` includes the project root:
+Set `PYTHONPATH` if needed:
 ```bash
-export PYTHONPATH=$PYTHONPATH:/path/to/kappasha/tetrasurfaces
+export PYTHONPATH=$PYTHONPATH:/path/to/kappashaos
 ```
 
 ## License
-Kappasha is dual-licensed under the Apache License 2.0 and GNU Affero General Public License v3.0 or later. See the file headers for details. Unauthorized use is prohibited without permission from Beau Ayres.
+KappashaOS is dual-licensed under the Apache License 2.0 and GNU Affero General Public License v3.0 or later. See file headers for details. Unauthorized use is prohibited without permission from Beau Ayres.
 
 Copyright 2025 Beau Ayres
 
 ## Contributing
-Contributions are welcome. Fork the repo, make changes, and submit a pull request. Focus on improving porosity modeling, welding simulations, or adding new features like real-time ray tracing.
+Fork the repo, enhance decision-making, welding sims, or Cython optimizations, and submit a pull request. Focus on kappa navigation or arbitrage improvements.
 
 ## Contact
-For issues or suggestions, open an issue on GitHub or contact Beau Ayres.
+Open an issue on GitHub or contact Beau Ayres for support.
