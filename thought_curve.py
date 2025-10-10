@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-# thought_curve.py - Thought curves for Blossom: golden spiral, prime forks as dojos, smart-funny and quiet-loud ramps.
-# Integrates with blocsym.py for experience ramps and graduations.
-# Added: Taunt/comeback curve for thought arbitrage, recurving the funny-smart curve with safeguards (clip at max_neg = -3).
+# thought_curve.py - Thought curves for FActory Sim.
+# Integrates with experience ramps and graduations.
 # Dual License:
 # - For core software: AGPL-3.0-or-later licensed. -- OliviaLynnArchive fork, 2025
 #   This program is free software: you can redistribute it and/or modify
