@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+# kappasha_os.py - Kappa-tilted OS with rhombus voxel navigation, factory sim integration.
+# CLI-driven, no GUI, DOS Navigator soul in 3D. Pure civilian engineering.
+# Dual License:
+# - For core software: AGPL-3.0-or-later licensed. -- OliviaLynnArchive fork, 2025
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU Affero General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#   GNU Affero General Public License for more details.
+#
+#   You should have received a copy of the GNU Affero General Public License
+#   along with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+# - For hardware/embodiment interfaces (if any): Licensed under the Apache License, Version 2.0
+#   with xAI amendments for safety (prohibits misuse in hashing; revocable for unethical use).
+#   See http://www.apache.org/licenses/LICENSE-2.0 for details.
+#
+# Copyright 2025 xAI
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
+
+import simpy
+import numpy as np
+from nav3d import RhombusNav
+from tetra.factory_sim import FactorySim
+from ghost_hand import GhostHand
+from thought_curve import ThoughtCurve
+
+class kappashaOS:
+    def __init__(self):
+        self.env = simpy.Environment()
+        self.nav = RhombusNav(kappa=0.2)
+        self.factory = FactorySim(self.env)
+        self.hand = GhostHand(kappa=0.2)
+        self.curve = ThoughtCurve()
+        self.commands = []  # Command history
+        print("kappasha OS booted - kappa-tilted rhombus grid ready.")
+
+    def run_command(self, cmd):
+        """Execute CLI commands with kappa awareness."""
+        self.commands.append(cmd)
+        if cmd == "ls":
+            front, right, top = self.nav.project_third_angle()
+            print("FRONT:\n", front[:3, :3])
+            print("RIGHT:\n", right[:3, :3])
+            print("TOP:\n", top[:3, :3])
+        elif cmd.startswith("tilt"):
+            try:
+                dk = float(cmd.split()[1])
+                self.nav.kappa += dk
+                self.factory.kappa += dk
+                self.hand.kappa += dk
+                self.hand.pulse(2)  # Haptic tilt feedback
+                print(f"Kappa now {self.nav.kappa:.3f}")
+            except:
+                print("usage: tilt 0.05")
+        elif cmd.startswith("cd"):
+            try:
+                path = cmd.split()[1]
+                self.nav.path.append(path)
+                if len(self.nav.path) > 1:
+                    tangent, _ = self.curve.spiral_tangent(self.nav.path[-2], self.nav.path[-1])
+                    if tangent:
+                        self.hand.pulse(3)  # Hedge alert
+                        print("Path hedge: unwind")
+                print(f"Curved to /{path}")
+            except:
+                print("usage: cd logs")
+        elif cmd.startswith("unlock"):
+            try:
+                coord = tuple(map(int, cmd.split()[1].strip("()").split(",")))
+                if self.nav.unlock_edge(coord):
+                    self.factory.register_kappa("edge_unlock")
+            except:
+                print("usage: unlock (7,0,0)")
+        elif cmd.startswith("archu render"):
+            print("Rendering rhombus grid STL...")
+            self.nav.project_third_angle()  # Reuse for STL mock
+        elif cmd.startswith("devu lockout"):
+            try:
+                target = cmd.split()[1]
+                self.factory.trigger_emergency(target)
+            except:
+                print("usage: devu lockout gas_line")
+        else:
+            print("kappasha: ls | tilt 0.05 | cd logs | unlock (7,0,0) | archu render | devu lockout gas_line")
+
+    def run_day(self):
+        """Simulate a factory day with kappa navigation."""
+        print(f"Day start - Situational Kappa = {self.factory.get_situational_kappa():.3f}")
+        yield self.env.timeout(20)  # 20s to incident
+        self.factory.trigger_emergency("gas_rupture")
+        self.factory.register_kappa("gas_rupture")
+        self.run_command("cd weld")  # Navigate to weld bay
+        self.run_command("unlock (7,0,0)")  # Check edge
+        yield self.env.process(self.factory.auto_rig("gas_line"))
+        self.run_command("ls")  # View grid
+        print(f"Day end - Situational Kappa = {self.factory.get_situational_kappa():.3f}")
+
+if __name__ == "__main__":
+    os = kappashaOS()
+    os.env.process(os.run_day())
+    os.env.run(until=60)
