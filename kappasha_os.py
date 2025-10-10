@@ -42,7 +42,7 @@ from tetra.factory_sim import FactorySim
 from ghost_hand import GhostHand
 from thought_curve import ThoughtCurve
 
-class kappashaOS:
+class KappashaOS:
     def __init__(self):
         self.env = simpy.Environment()
         self.nav = RhombusNav(kappa=0.2)
