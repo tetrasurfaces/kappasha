@@ -41,31 +41,45 @@ from rhinoinside import GrasshopperAPI    # Hypothetical, use Rhino Python
 from keyshot_api import KeyshotAPI        # Hypothetical, use Keyshot Python
 
 def read_config(config_file="config.json"):
-    """Read intent and commercial use from config file."""
+    """Read intent and commercial use from config file with error handling."""
     if not os.path.exists(config_file):
+        print(f"Config file {config_file} not found. Creating default.")
+        write_config("none", False, config_file)
         return None, False
     try:
         with open(config_file, "r") as f:
             config = json.load(f)
-        return config.get("intent"), config.get("commercial_use", False)
+        intent = config.get("intent")
+        commercial_use = config.get("commercial_use", False)
+        if intent not in ["educational", "commercial", "none"]:
+            raise ValueError("Invalid intent in config.")
+        return intent, commercial_use
+    except json.JSONDecodeError:
+        print(f"Error: {config_file} contains invalid JSON. Resetting to default.")
+        write_config("none", False, config_file)
+        return None, False
     except Exception as e:
-        print(f"Error reading config: {e}")
+        print(f"Error reading {config_file}: {e}. Resetting to default.")
+        write_config("none", False, config_file)
         return None, False
 
 def write_config(intent, commercial_use, config_file="config.json"):
-    """Write intent and commercial use to config file."""
+    """Write intent and commercial use to config file with error handling."""
     config = {"intent": intent, "commercial_use": commercial_use}
     try:
         with open(config_file, "w") as f:
             json.dump(config, f, indent=4)
     except Exception as e:
-        print(f"Error writing config: {e}")
+        print(f"Error writing to {config_file}: {e}")
 
 def log_license_check(result, intent, commercial_use):
     """Log license check results for audit trail."""
-    with open("license_log.txt", "a") as f:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"[{timestamp}] License Check: {result}, Intent: {intent}, Commercial: {commercial_use}\n")
+    try:
+        with open("license_log.txt", "a") as f:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"[{timestamp}] License Check: {result}, Intent: {intent}, Commercial: {commercial_use}\n")
+    except Exception as e:
+        print(f"Error logging license check: {e}")
 
 def check_license(commercial_use=False, intent=None):
     """Ensure license compliance and intent declaration before processing."""
@@ -133,7 +147,7 @@ def import_clay_scan(stl_file):
 def main():
     # Read intent from config
     intent, commercial_use = read_config()
-    if not intent:
+    if not intent or intent == "none":
         intent = input("Enter intent (educational/commercial): ").strip().lower()
         commercial_use = intent == "commercial"
         write_config(intent, commercial_use)
