@@ -43,8 +43,9 @@ from ghost_hand import GhostHand
 from thought_curve import ThoughtCurve
 from arch_utils.render import render
 from dev_utils.lockout import lockout
-from dev_utils.hedge import hedge
+from dev_utils.hedge import hedge, multi_hedge
 from dev_utils.grep import grep
+from dev_utils.thought_arb import thought_arb
 
 class KappashaOS:
     def __init__(self):
@@ -54,22 +55,23 @@ class KappashaOS:
         self.hand = GhostHand(kappa=0.2)
         self.curve = ThoughtCurve()
         self.commands = []
-        self.sensor_data = []  # Mock sensor feed (gyro, camera)
-        print("Kappasha OS booted - kappa-tilted rhombus grid with sensor support ready.")
+        self.sensor_data = []
+        self.decisions = []  # Log decision outcomes
+        print("Kappasha OS booted - kappa-tilted rhombus grid with decision support ready.")
 
     def poll_sensor(self):
         """Simulate real-time sensor input (gyro, camera)."""
         while True:
-            gyro = np.random.uniform(0, 20)  # Mock gyro tilt
-            drift = np.random.rand() * 0.1  # Mock camera drift
+            gyro = np.random.uniform(0, 20)
+            drift = np.random.rand() * 0.1
             self.sensor_data.append((self.env.now, gyro, drift))
-            if gyro > 10 or drift > 0.05:  # Threshold for kappa adjustment
+            if gyro > 10 or drift > 0.05:
                 self.nav.kappa += 0.1
                 self.factory.kappa += 0.1
                 self.hand.kappa += 0.1
                 self.hand.pulse(2)
                 print(f"Sensor alert: Kappa adjusted to {self.nav.kappa:.3f} (gyro={gyro:.1f}, drift={drift:.2f})")
-            yield self.env.timeout(5)  # Poll every 5s
+            yield self.env.timeout(5)
 
     def run_command(self, cmd):
         """Execute CLI commands with kappa awareness."""
@@ -134,23 +136,34 @@ class KappashaOS:
         elif cmd.startswith("kappa hedge multi"):
             try:
                 paths = cmd.split()[2].strip("[]").split(",")
-                for path in paths:
-                    self.nav.path.append(path.strip())
-                multi_hedge = [hedge(self.curve, [self.nav.path[-2], self.nav.path[-1]]) for _ in range(2)]
-                if "unwind" in multi_hedge:
+                paths = [p.strip() for p in paths]
+                hedge_action = multi_hedge(self.curve, [(paths[-2], paths[-1])] if len(paths) > 1 else [(paths[0], paths[0])])
+                if "unwind" in hedge_action:
                     self.hand.pulse(4)
-                    print("Multi-path hedge: unwind suggested")
+                    print(f"Multi-path hedge: {hedge_action}")
                 else:
-                    print("Multi-path hedge: hold")
+                    print(f"Multi-path hedge: {hedge_action}")
             except:
                 print("usage: kappa hedge multi [gate,weld]")
+        elif cmd.startswith("kappa decide"):
+            try:
+                intent = cmd.split()[2]
+                action = thought_arb(self.curve, self.factory.history, intent)
+                self.decisions.append((self.env.now, intent, action))
+                self.hand.pulse(2 if action == "unwind" else 1)
+                print(f"Decision: {intent} - {action}")
+                if action == "unwind":
+                    self.nav.kappa += 0.05  # Adjust kappa on arbitrage
+                    print(f"Kappa adjusted to {self.nav.kappa:.3f} due to arbitrage")
+            except:
+                print("usage: kappa decide weld")
         else:
-            print("kappa: ls | tilt 0.05 | cd logs | unlock (7,0,0) | arch_utils render | dev_utils lockout gas_line | grep /warp=0.2+/ | sensor | hedge multi [gate,weld]")
+            print("kappa: ls | tilt 0.05 | cd logs | unlock (7,0,0) | arch_utils render | dev_utils lockout gas_line | grep /warp=0.2+/ | sensor | hedge multi [gate,weld] | decide weld")
 
     def run_day(self):
         """Simulate a factory day with kappa navigation."""
         print(f"Day start - Situational Kappa = {self.factory.get_situational_kappa():.3f}")
-        self.env.process(self.poll_sensor())  # Start sensor polling
+        self.env.process(self.poll_sensor())
         yield self.env.timeout(20)
         self.factory.trigger_emergency("gas_rupture")
         self.factory.register_kappa("gas_rupture")
@@ -159,10 +172,12 @@ class KappashaOS:
         self.run_command("kappa grep /gas_rupture/")
         self.run_command("kappa sensor")
         self.run_command("kappa hedge multi [gate,weld]")
+        self.run_command("kappa decide weld")
         yield self.env.process(self.factory.auto_rig("gas_line"))
         self.run_command("kappa ls")
         self.run_command("arch_utils render")
         print(f"Day end - Situational Kappa = {self.factory.get_situational_kappa():.3f}")
+        print(f"Decisions made: {self.decisions}")
 
 if __name__ == "__main__":
     os = KappashaOS()
