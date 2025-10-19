@@ -67,6 +67,6 @@ See GNU AGPL v3.0.
 Contributing
 Fork, enhance kappa navigation, arbitrage, or k.k kinematics. Submit pull requests. Share back under AGPL.
 Contact
-Issues on GitHub or email todd@tetraservices.com.au (Tetra Services). No DMs.
-Manuscript Constant
+Issues on GitHub or email SENDTOTODDHUTCHINSON@GMAIL.COM (Tetrasurfaces). No DMs.
+## Manuscript Constant
 0.19462501 - The seed of all curves. Push once to bloom.
