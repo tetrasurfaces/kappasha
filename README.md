@@ -1,140 +1,72 @@
-# README for Kappasha
-
+# README for KappashaOS
 ## Overview
-Kappasha is a GitHub repository forked from the original hashlet project, evolved into a kappa-tilted operating system (KappashaOS) blending computational geometry with real-time decision-making for factory environments. Inspired by tetrahedral meshes and fractal patterns, it models complex surfaces and integrates thought arbitrage—detecting intent-registry divergences—alongside welding simulations and environmental factors. Rooted in repos like `fractal_tetra` and steel case-hardening simulations, "hashing" tracks cryptographic data and material phase transformations.
+KappashaOS is a GitHub repository evolved from the original hashlet project, now a kappa-tilted operating system blending computational geometry with real-time decision-making for factory environments, design studios, and research. Inspired by tetrahedral meshes, fractal spirals, and the 0.19462501 manuscript constant, it models complex surfaces, tracks curvature hashes, and integrates thought arbitrage—detecting intent-registry divergences. Rooted in repos like `fractal_tetra` and welding simulations, it hashes cryptographic data alongside material phase transformations.
 
-Designed for developers, welders, and researchers, KappashaOS intersects geometry, haptics, and physical simulations. It features Python scripts with Cython optimization for rhombus voxel grids, porosity modeling, and gyroscopic stabilization, tailored for welding, infrastructure monitoring, and material science.
+Designed for welders, designers, and innovators, KappashaOS intersects geometry, haptics, and physical simulations. It replaces G-code with k.k (kappa kinematics), optimized in Python with Cython for rhombus voxel grids, porosity modeling, and gyroscopic stabilization.
 
 ## Features
-- **Kappa-Tilted Navigation**: 3D rhombus voxel grid with real-time kappa adjustments, Cython-optimized for speed.
-- **Thought Arbitrage**: Detects mismatches between user intent and factory registry, logged with Cython-enhanced checks.
-- **Welding Simulations**: Models sequences with preheating, bead length, arc length, voltage, amperage, and environmental factors (wind, smoke, light).
-- **Porosity and Material Tracking**: Simulates void growth during transformations, up to 30% porosity, with phase hashing.
-- **Haptic Feedback**: Integrates `ghost_hand` for tactile cues on kappa drifts or arbitrage flags.
-- **Modular Components**: 
-  - `arch_utils/render.py`: Dynamic STL rendering with decision clash shading.
-  - `dev_utils/lockout.py`: Tags incidents like gas ruptures.
-  - `dev_utils/hedge.py`: Suggests alternate paths on unwind.
-  - `dev_utils/grep.py`: Perl-style regex for log parsing.
-  - `dev_utils/thought_arb.py`: Implements thought arbitrage.
-  - `gyrogimbal.py`: Stabilizes motion with gyro data.
-  - `frictionvibe.py`: Models vibration damping.
-  - `telemetry.py`: Logs mesh and stress data.
-- **CLI Interface**: Commands like `kappa ls`, `kappa decide weld`, `kappa hedge multi [gate,weld]`, optimized with Cython.
-- **Testing and Logging**: Includes test stubs and decision history tracking.
+- **Kappa-Tilted Navigation**: 3D rhombus voxel grid with real-time kappa adjustments, Cython-optimized.
+- **Thought Arbitrage**: Detects intent mismatches, logged with Cython checks.
+- **k.k Kinematics**: Replaces G-code with curvature-based commands (e.g., `k0 X0.19462501 Y0.618`).
+- **Welding Simulations**: Models sequences—preheat, bead length, arc, voltage, amperage, wind, smoke.
+- **Porosity Tracking**: Simulates void growth (up to 30%), hashed per phase.
+- **Haptic Feedback**: `ghost_hand` pulses on kappa drifts or arbitrage flags.
+- **Modular Components**:
+  - `arch_utils/render.py`: Dynamic STL rendering with clash shading.
+  - `dev_utils/lockout.py`: Tags incidents (e.g., gas ruptures).
+  - `dev_utils/hedge.py`: Suggests alternate paths.
+  - `dev_utils/grep.py`: Perl-style log parsing.
+  - `dev_utils/thought_arb.py`: Arbitrage logic.
+  - `gyrogimbal.py`: Gyro stabilization.
+  - `frictionvibe.py`: Vibration damping.
+- **CLI Interface**: Commands like `kappa ls`, `kappa decide weld`, `kappa hedge multi [gate,weld]`.
+- **Easter Egg**: `Hunt Primes` - offline GIMPS integration, seeds with 0.19462501.
 
 ## Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/kappasha.git
+   git clone https://github.com/toddhutchinson/kappasha.git
    cd kappasha
-   ```
 
-2. Create and activate a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+Create and activate a virtual environment:
+bashpython -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-3. Install dependencies:
-   ```bash
-   pip install numpy matplotlib scipy pandas pytest simpy cython
-   ```
+Install dependencies:
+bashpip install numpy matplotlib scipy pandas cython
 
-4. Compile Cython modules:
-   ```bash
-   python setup.py build_ext --inplace
-   ```
+Compile Cython modules:
+bashpython setup.py build_ext --inplace
 
-5. Optional for advanced features (e.g., haptics, 3D export):
-   ```bash
-   pip install pyserial opencv-python
-   ```
+Optional (haptics, 3D export):
+bashpip install pyserial opencv-python
 
-## Usage
-Run KappashaOS from the root directory. Core functionality spans `nav3d.py` and `kappasha_os.py`, with modules in `arch_utils` and `dev_utils`.
 
-- **Basic Navigation**:
-  ```bash
-  python kappasha_os.py
-  ```
-  Use `kappa ls` to view the optimized rhombus grid.
+Usage
+Run from root. Core files: kappasha_os.py, nav3d.py.
 
-- **Welding Simulation**:
-  ```bash
-  python kappasha_os.py
-  ```
-  Run `kappa cd weld` to navigate, `dev_utils lockout gas_line` for incidents.
+Basic Navigation: python kappasha_os.py → kappa ls for grid view.
+Welding Sim: python kappasha_os.py → kappa cd weld, dev_utils lockout gas_line.
+Decision-Making: kappa decide weld → arbitrage check, ghost_hand pulse.
+Path Hedging: kappa hedge multi [gate,weld] → alternate paths.
+Hunt Primes: ./easter/hunt-primes.sh → enter creds, hunt Mersenne decimals.
 
-- **Decision-Making**:
-  ```bash
-  python kappasha_os.py
-  ```
-  Type `kappa decide weld` to check arbitrage, feel ghost_hand pulse.
+Code Development
 
-- **Path Hedging**:
-  ```bash
-  python kappasha_os.py
-  ```
-  Use `kappa hedge multi [gate,weld]` for alternate suggestions.
+Core: nav3d.py, kappasha_os.py, kappasha_os_cython.pyx (kappa tilt, arbitrage).
+Adapt: Enhance thought_arb.py (multi-intent), render.py (clash shading).
+Extend: Add --env outdoor to kappasha_os.py, --rays to telemetry.py.
 
-- **Log Parsing**:
-  ```bash
-  python kappasha_os.py
-  ```
-  Run `kappa grep /gas_rupture/` to filter incidents.
+License
+KappashaOS is licensed under GNU Affero General Public License v3.0 only.
 
-For custom tweaks, edit `arch_utils/render.py` for voxel rendering or `dev_utils/thought_arb.py` for arbitrage logic. Recompile after changes with `python setup.py build_ext --inplace`.
+Copyright 2025 Todd Macrae Hutchinson (69 Dollard Ave, Mannum SA 5238) with Beau Ayres.
+Amendment: No use in biological synthesis, gene editing, or wetware without explicit, non-coerced organism consent. Violation revokes license. Non-living applications permitted.
+See GNU AGPL v3.0.
 
-## Code List of Generations and Adaptations Needed for KappashaOS
-The repository requires ongoing development:
-
-1. **Core Files Generation**:
-   - `nav3d.py`: Rhombus voxel navigation with kappa tilt.
-   - `kappasha_os.py`: OS integration with sensor polling and CLI.
-   - `kappasha_os_cython.pyx`: Cython-optimized projection and arbitrage.
-   - `gyrogimbal.py`: Gyroscopic stabilization for motion.
-   - `frictionvibe.py`: Vibration damping for porosity.
-   - `telemetry.py`: Log decisions and stresses.
-
-2. **Adaptations**:
-   - Enhance `thought_arb.py` with multi-intent arbitrage.
-   - Update `render.py` for real-time clash shading.
-   - Refine `hedge.py` for dynamic path prioritization.
-   - Integrate `grep.py` with sensor data parsing.
-
-3. **Extensions**:
-   - Add `--env outdoor` to `kappasha_os.py` for wind/smoke sims.
-   - Implement `--rays` in `telemetry.py` for light tracing.
-   - Create `weldtest.py` for preheat vs. crack analysis.
-
-4. **Dependencies**:
-   - `numpy` for grid math.
-   - `matplotlib` for visualization.
-   - `scipy` for physics.
-   - `simpy` for simulation.
-   - `cython` for optimization.
-   - `pytest` for testing.
-
-## Testing
-Run the test suite:
-```bash
-cd kappashaos
-pytest tests/test_os.py -v
-```
-
-Set `PYTHONPATH` if needed:
-```bash
-export PYTHONPATH=$PYTHONPATH:/path/to/kappashaos
-```
-
-## License
-KappashaOS is dual-licensed under the Apache License 2.0 and GNU Affero General Public License v3.0 or later. See file headers for details. Unauthorized use is prohibited without permission from Beau Ayres.
-
-Copyright 2025 Beau Ayres
-
-## Contributing
-Fork the repo, enhance decision-making, welding sims, or Cython optimizations, and submit a pull request. Focus on kappa navigation or arbitrage improvements.
-
-## Contact
-Open an issue on GitHub or contact Beau Ayres for support.
+Contributing
+Fork, enhance kappa navigation, arbitrage, or k.k kinematics. Submit pull requests. Share back under AGPL.
+Contact
+Issues on GitHub or email todd@tetraservices.com.au (Tetra Services). No DMs.
+Manuscript Constant
+0.19462501 - The seed of all curves. Push once to bloom.
