@@ -7,7 +7,7 @@ Designed for welders, designers, and innovators, KappashaOS intersects geometry,
 ## Features
 - **Kappa-Tilted Navigation**: 3D rhombus voxel grid with real-time kappa adjustments, Cython-optimized.
 - **Thought Arbitrage**: Detects intent mismatches, logged with Cython checks.
-- **k.k Kinematics**: Replaces G-code with curvature-based commands (e.g., `k0 X0.19462501 Y0.618`).
+- **k.k (kappa Kinematics)**: Replaces G-code with curvature-based commands (e.g., `k0 X0.19462501 Y0.618`).
 - **Welding Simulations**: Models sequences—preheat, bead length, arc, voltage, amperage, wind, smoke.
 - **Porosity Tracking**: Simulates void growth (up to 30%), hashed per phase.
 - **Haptic Feedback**: `ghost_hand` pulses on kappa drifts or arbitrage flags.
