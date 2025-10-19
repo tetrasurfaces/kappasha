@@ -2,20 +2,12 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # kappasha_os_cython.pyx - Cython-optimized functions for KappashaOS.
-# Dual License:
-# - For core software: AGPL-3.0-or-later licensed. -- OliviaLynnArchive fork, 2025
-#   This program is free software: you can redistribute it and/or modify
-#   it under the terms of the GNU Affero General Public License as published by
-#   the Free Software Foundation, either version 3 of the License, or
-#   (at your option) any later version.
-#
-#   This program is distributed in the hope that it will be useful,
-#   but WITHOUT ANY WARRANTY; without even the implied warranty of
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-#   GNU Affero General Public License for more details.
-#
-#   You should have received a copy of the GNU Affero General Public License
-#   along with this program. If not, see <https://www.gnu.org/licenses/>.
+# Licensed under GNU Affero General Public License v3.0 only
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, version 3.
+# No warranty. No wetware. Breath only.
+# Amendment: Biological use requires consent. Curve only. No bio hashes.
 #
 # - For hardware/embodiment interfaces (if any): Licensed under the Apache License, Version 2.0
 #   with xAI amendments for safety (prohibits misuse in hashing; revocable for unethical use).
@@ -34,7 +26,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: (AGPL 3.0) AND Apache-2.0
 
 import numpy as np
 cimport numpy as np
