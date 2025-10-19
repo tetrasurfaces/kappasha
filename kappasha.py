@@ -7,7 +7,6 @@
 # by the Free Software Foundation, version 3.
 # No warranty. No wetware. Breath only.
 # Amendment: Biological use requires consent. Curve only. No bio hashes.
-
 # KappashaOS/core/kappasha_os.py
 # Copyright (C) 2025 Todd Macrae Hutchinson (69 Dollard Ave, Mannum SA 5238)
 # AGPL-3.0 only. No warranty. No wetware.
