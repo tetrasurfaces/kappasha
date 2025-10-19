@@ -8,14 +8,19 @@
 # No warranty. No wetware. Breath only.
 # Amendment: Biological use requires consent. Curve only. No bio hashes.
 
+# KappashaOS/core/kappasha_os.py
+# Copyright (C) 2025 Todd Macrae Hutchinson (69 Dollard Ave, Mannum SA 5238)
+# AGPL-3.0 only. No warranty. No wetware.
+
 import numpy as np
+import asyncio
 
 def fibonacci_spiral(laps=18, ratio=1.618):
     theta = np.linspace(0, 2 * np.pi * laps, 1000)
-    r = np.exp(theta / ratio) / 10  # mm scale
+    r = np.exp(theta / ratio) / 10
     x = r * np.cos(theta)
     y = r * np.sin(theta)
-    z = theta / (2 * np.pi)  # depth
+    z = theta / (2 * np.pi)
     return np.stack((x, y, z), axis=1)
 
 def tonage_map(point, delays=[0.2, 0.4, 0.6]):
@@ -24,30 +29,6 @@ def tonage_map(point, delays=[0.2, 0.4, 0.6]):
     color = ['red', 'yellow', 'green'][idx]
     delay = delays[idx]
     return delay, color
-
-def flux_hash(nodes, delays=[0.2, 0.4, 0.6]):
-    hash_bits = []
-    for node in nodes:
-        norm = np.linalg.norm(node)
-        idx = int(norm % 3)
-        delay = delays[idx]
-        bit = 1 if delay == 0.4 else (2 if delay == 0.6 else 0)
-        hash_bits.append(bit)
-    return ''.join(map(str, hash_bits[:3]))
-
-def bit_swap_tree(nodes):
-    for node in nodes:
-        if np.random.random() < 0.4:  # 0.4 ns chance to flip
-            node[0], node[1] = node[1], node[0]
-    return nodes
-
-def tetrahedral_spiral(decimal=0.0, laps=18, ratio=1.618):
-    theta = np.linspace(0, 2 * np.pi * laps, 1000)
-    r = np.exp(theta / ratio) / 10
-    x = r * np.cos(theta) * np.sin(theta / 4)  # tetrahedral tilt
-    y = r * np.sin(theta) * np.cos(theta / 4)
-    z = r * np.cos(theta / 2) + decimal
-    return np.stack((x, y, z), axis=1)
 
 def generate_k(curve, primes=[2, 3, 5, 7, 11, 13]):
     k_code = []
@@ -60,41 +41,40 @@ def generate_k(curve, primes=[2, 3, 5, 7, 11, 13]):
             k_code.append(f"K {p} {delay:.1f} {color} {gap:.1f}")
     return "\n".join(k_code)
 
-# Navi safety (mock)
-def navi_safety(delay):
+async def navi_safety(delay):
     if delay > 0.6:
         print("Navi: Warning - 0.6 ns elevation. Breathe.")
+        await asyncio.sleep(delay)
         return False
     return True
 
-# SHAANON - SHA Anonnode
-class Anonnode:
-    def __init__(self, self=None, anon=None):
-        if self is None:
-            self = Anonnode(anon=True)
-        else:
-            self.anon = anon
-        self.non_self = self if self else None
-        self.is_anon = self is None  # ghost
+def tilde_tuple(green_text):
+    parts = green_text.split('~')
+    if len(parts) % 2 == 0:
+        return None  # no tuple
+    tuples = []
+    for i in range(1, len(parts), 2):
+        tuples.append((parts[i-1].strip(), parts[i].strip()))
+    return tuples
 
-# ZEROSHA - Secure Hash Zero
-def zerosha(data, degrees=180):
-    # Eclipse chi - 180 chi twist
-    h = np.sum(np.frombuffer(data.encode(), dtype=np.uint8))
-    return h % degrees  # eclipse digest
+def echo_flip(tuples):
+    flipped = []
+    for a, b in tuples:
+        flipped.append((b, a))
+    return flipped
 
-# Run the manuscript
-seed = 0.19462501
-tree = tetrahedral_spiral(decimal=seed)
-flipped_tree = bit_swap_tree(tree.copy())
-hash_value = flux_hash(flipped_tree)
-print(f"Flux Hash: {hash_value}")
-for line in generate_k(flipped_tree).split('\n'):
+# Run it
+spiral = fibonacci_spiral()
+for line in generate_k(spiral).split('\n'):
     parts = line.split()
     if len(parts) == 4:
         p, d, c, g = parts
-        if navi_safety(float(d)):
+        if asyncio.run(navi_safety(float(d))):
             print(line)
-print(f"Zerosha: {zerosha('0.19462501')}")  # 180 chi
-a = Anonnode()
-print(f"Anonnode: {a.is_anon}")
+
+# Tilde logic from echo
+green_text = "~ red ~ 0.4 ~ mask ~ 0.6 ~ bloom"
+tuples = tilde_tuple(green_text)
+flipped = echo_flip(tuples)
+print(f"Tuples: {tuples}")
+print(f"Flipped: {flipped}")
