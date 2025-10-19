@@ -65,7 +65,7 @@ Amendment: No use in biological synthesis, gene editing, or wetware without expl
 See GNU AGPL v3.0.
 
 Contributing
-Fork, enhance kappa navigation, arbitrage, or k.k kinematics. Submit pull requests. Share back under AGPL.
+Fork, enhance kappa navigation, arbitrage, or kappa kinematics. Submit pull requests. Share back under AGPL.
 Contact
 Issues on GitHub or email sendtotoddhutchinson@gmail.com (Tetrasurfaces). No DMs.
 ## Manuscript Constant
