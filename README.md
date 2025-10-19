@@ -29,17 +29,17 @@ Designed for welders, designers, and innovators, KappashaOS intersects geometry,
    cd kappasha
 
 Create and activate a virtual environment:
-bashpython -m venv venv
+bash python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 Install dependencies:
-bashpip install numpy matplotlib scipy pandas cython
+bash pip install numpy matplotlib scipy pandas cython
 
 Compile Cython modules:
-bashpython setup.py build_ext --inplace
+bash python setup.py build_ext --inplace
 
 Optional (haptics, 3D export):
-bashpip install pyserial opencv-python
+bash pip install pyserial opencv-python
 
 
 Usage
