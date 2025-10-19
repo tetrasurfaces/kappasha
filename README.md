@@ -25,7 +25,7 @@ Designed for welders, designers, and innovators, KappashaOS intersects geometry,
 ## Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/toddhutchinson/kappasha.git
+   git clone https://github.com/tetrasurfaces/kappasha.git
    cd kappasha
 
 Create and activate a virtual environment:
