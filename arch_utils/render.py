@@ -36,7 +36,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import numpy as np
-from tetras import fractal_tetra
+from tetra.tetras import fractal_tetra
 import struct
 
 def render(grid, kappa, surface_id="grid"):
